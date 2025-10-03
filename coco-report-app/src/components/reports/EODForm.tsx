@@ -58,7 +58,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [cashPreviousDay, setCashPreviousDay] = useState<number>(0)
-  const [reportId, setReportId] = useState<string | null>(initialData?.id as string || null)
+  const [reportId] = useState<string | null>(initialData?.id as string || null)
   const [displayValues, setDisplayValues] = useState<Record<string, string>>({})
   const [withdrawals, setWithdrawals] = useState<Array<{id: string, amount: number, reason: string}>>([{id: '1', amount: 0, reason: ''}])
 
@@ -102,7 +102,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     if (initialData) {
       fetchWithdrawals()
     }
-  }, [])
+  }, [initialData])
 
   // Initialize displayValues with initialData when editing
   useEffect(() => {
@@ -133,12 +133,12 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     if (formData.venue_id && formData.for_date) {
       fetchPreviousDayCash()
     }
-  }, [formData.venue_id, formData.for_date])
+  }, [formData.venue_id, formData.for_date, fetchPreviousDayCash])
 
   // Update formData withdrawal when withdrawals change
   useEffect(() => {
     setFormData(prev => ({ ...prev, withdrawal: getTotalWithdrawals() }))
-  }, [withdrawals])
+  }, [withdrawals, getTotalWithdrawals])
 
   const fetchVenues = async () => {
     try {

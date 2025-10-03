@@ -8,7 +8,7 @@ interface CacheEntry<T> {
 }
 
 class SimpleCache {
-  private cache = new Map<string, CacheEntry<any>>()
+  private cache = new Map<string, CacheEntry<unknown>>()
 
   set<T>(key: string, data: T, ttlMs: number = 5 * 60 * 1000): void {
     this.cache.set(key, {
@@ -72,7 +72,7 @@ if (typeof window === 'undefined') {
 }
 
 // Helper function to generate cache keys
-export function generateCacheKey(prefix: string, params: Record<string, any>): string {
+export function generateCacheKey(prefix: string, params: Record<string, unknown>): string {
   const sortedParams = Object.keys(params)
     .sort()
     .map(key => `${key}:${params[key]}`)

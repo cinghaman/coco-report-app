@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { User, Venue } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import {
@@ -17,11 +17,10 @@ import {
   BarChart,
   Bar,
   Legend,
-  Brush,
-  ReferenceLine
+  Brush
 } from 'recharts'
 // import { FixedSizeList as List } from 'react-window'
-import { format, startOfDay, endOfDay, subDays, subMonths, subYears } from 'date-fns'
+import { format, startOfDay, subDays } from 'date-fns'
 
 interface AnalyticsData {
   totalGrossSales: number
@@ -60,15 +59,10 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
   const [chartType, setChartType] = useState<'line' | 'bar' | 'pie'>('line')
   
   // Performance and responsiveness state
-  const [zoomLevel, setZoomLevel] = useState<'day' | 'week' | 'month' | 'quarter' | 'year'>('day')
   const [currentPage, setCurrentPage] = useState(0)
   const [itemsPerPage, setItemsPerPage] = useState(50)
   const [isVirtualized, setIsVirtualized] = useState(false)
   const [aggregationLevel, setAggregationLevel] = useState<'raw' | 'hourly' | 'daily' | 'weekly' | 'monthly'>('daily')
-  
-  // Refs for performance
-  const chartRef = useRef<HTMLDivElement>(null)
-  const resizeObserverRef = useRef<ResizeObserver | null>(null)
 
   const getDateRange = () => {
     const now = new Date()
@@ -224,7 +218,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
   }, [])
 
   // Smart data aggregation function
-  const aggregateData = useCallback((data: any[], level: string) => {
+  const aggregateData = useCallback((data: Array<{ date: string; gross_sales: number; tips: number; voids: number; loss: number; withdrawals: number }>, level: string) => {
     if (level === 'raw' || data.length <= 100) return data
 
     const grouped = new Map()
@@ -303,7 +297,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
     }
 
     return aggregatedData
-  }, [analyticsData?.dailyData, getOptimalAggregation, aggregateData, aggregationLevel, isVirtualized, itemsPerPage])
+  }, [analyticsData?.dailyData, getOptimalAggregation, aggregateData, getOptimalPageSize, shouldVirtualize, aggregationLevel, isVirtualized, itemsPerPage])
 
   // Paginated data for large datasets
   const paginatedData = useMemo(() => {
@@ -319,10 +313,10 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
     return isVirtualized ? Math.ceil(optimizedChartData.length / itemsPerPage) : 1
   }, [optimizedChartData.length, isVirtualized, itemsPerPage])
 
-  // Pagination handlers
-  const goToPage = useCallback((page: number) => {
-    setCurrentPage(Math.max(0, Math.min(page, totalPages - 1)))
-  }, [totalPages])
+  // Pagination handlers - goToPage is available but not currently used in UI
+  // const goToPage = useCallback((page: number) => {
+  //   setCurrentPage(Math.max(0, Math.min(page, totalPages - 1)))
+  // }, [totalPages])
 
   const goToNextPage = useCallback(() => {
     if (currentPage < totalPages - 1) {
@@ -353,8 +347,8 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
     }
   }, [analyticsData?.dailyData])
 
-  // Chart colors
-  const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
+  // Chart colors - defined but currently using inline colors in pie chart
+  // const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
 
   // Prepare pie chart data
   const getPieChartData = () => {
@@ -368,12 +362,22 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
   }
 
   // Custom tooltip for charts
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  interface TooltipProps {
+    active?: boolean
+    payload?: Array<{
+      name: string
+      value: number
+      color: string
+    }>
+    label?: string
+  }
+
+  const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-          <p className="font-medium">{formatDate(label)}</p>
-          {payload.map((entry: any, index: number) => (
+          <p className="font-medium">{formatDate(label || '')}</p>
+          {payload.map((entry, index: number) => (
             <p key={index} style={{ color: entry.color }}>
               {entry.name}: {formatCurrency(entry.value)}
             </p>
@@ -769,7 +773,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, value, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        label={(entry: any) => `${entry.name} ${(entry.percent * 100).toFixed(0)}%`}
                         outerRadius={120}
                         fill="#8884d8"
                         dataKey="value"

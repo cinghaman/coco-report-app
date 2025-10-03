@@ -67,10 +67,10 @@ export async function POST(request: NextRequest) {
     if (dailyAnalyticsError) throw dailyAnalyticsError
 
     // Calculate total withdrawals from daily data
-    const totalWithdrawals = dailyAnalyticsData?.reduce((sum: number, day: any) => sum + (Number(day.withdrawals) || 0), 0) || 0
+    const totalWithdrawals = dailyAnalyticsData?.reduce((sum: number, day: { withdrawals: number }) => sum + (Number(day.withdrawals) || 0), 0) || 0
 
     // Calculate averages based on actual days with data, not total date range
-    const daysWithData = dailyAnalyticsData?.filter(day => Number(day.gross_sales) > 0).length || 1
+    const daysWithData = dailyAnalyticsData?.filter((day: { gross_sales: number }) => Number(day.gross_sales) > 0).length || 1
     const averageDailySales = totalGrossSales / daysWithData
     const averageDailyWithdrawals = totalWithdrawals / daysWithData
 
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Populate daily data from database function results
-    dailyAnalyticsData?.forEach((day: any) => {
+    dailyAnalyticsData?.forEach((day: { date: string; gross_sales: number; tips: number; voids: number; loss: number; withdrawals: number }) => {
       const dateStr = day.date
       const dayData = dailyDataMap.get(dateStr)
       if (dayData) {
