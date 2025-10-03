@@ -1,0 +1,159 @@
+
+openapi: 3.1.0
+info:
+  title: Coco Reporting API
+  version: 1.0.0
+  description: >
+    REST + RPC surface for Coco Reporting built on Supabase (PostgREST + Edge Functions).
+servers:
+  - url: https://{project-ref}.supabase.co/rest/v1
+    description: Supabase PostgREST
+    variables:
+      project-ref:
+        default: YOUR_PROJECT_REF
+
+paths:
+  /daily_reports:
+    get:
+      summary: List reports
+      parameters:
+        - in: query
+          name: venue_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: for_date
+          schema: { type: string, format: date }
+        - in: query
+          name: status
+          schema: { type: string, enum: [draft, submitted, approved, locked] }
+        - in: query
+          name: select
+          schema: { type: string }
+      responses:
+        "200": { description: OK }
+    post:
+      summary: Create draft report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DailyReport'
+      responses:
+        "201": { description: Created }
+
+  /daily_reports/{id}:
+    patch:
+      summary: Update report (draft or admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DailyReport'
+      responses:
+        "200": { description: OK }
+
+  /field_definitions:
+    get:
+      summary: List active field definitions
+      responses:
+        "200": { description: OK }
+    post:
+      summary: Create / update field definition
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FieldDefinition'
+      responses:
+        "201": { description: Created }
+
+  /rpc/fn_prev_day_cash:
+    post:
+      summary: Get previous day cash for venue
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                p_venue: { type: string, format: uuid }
+                p_date: { type: string, format: date }
+      responses:
+        "200": { description: OK }
+
+  /rpc/fn_calc_reconciliation:
+    post:
+      summary: Calculate reconciliation for a report (no write)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                p_report: { type: string, format: uuid }
+      responses:
+        "200": 
+          description: OK
+
+components:
+  schemas:
+    DailyReport:
+      type: object
+      properties:
+        venue_id: { type: string, format: uuid }
+        for_date: { type: string, format: date }
+        status: { type: string, enum: [draft, submitted, approved, locked] }
+        total_sale_gross: { type: number, format: double }
+        card_1: { type: number }
+        card_2: { type: number }
+        cash: { type: number }
+        przelew: { type: number }
+        glovo: { type: number }
+        uber: { type: number }
+        wolt: { type: number }
+        pyszne: { type: number }
+        bolt: { type: number }
+        total_sale_with_special_payment: { type: number }
+        representation_note: { type: string }
+        representation_amount: { type: number }
+        strata_loss: { type: number }
+        flavour: { type: number }
+        withdrawal: { type: number }
+        locker_withdrawal: { type: number }
+        deposit: { type: number }
+        representacja: { type: number }
+        staff_cost: { type: number }
+        tips_cash: { type: number }
+        tips_card: { type: number }
+        cash_in_envelope_after_tips: { type: number }
+        left_in_drawer: { type: number }
+        total_cash_in_locker: { type: number }
+        serwis: { type: number }
+        serwis_k: { type: number }
+        company: { type: number }
+        voids: { type: number }
+        cash_previous_day: { type: number }
+        calculated_cash_expected: { type: number }
+        reconciliation_diff: { type: number }
+        notes: { type: string }
+
+    FieldDefinition:
+      type: object
+      properties:
+        venue_id: { type: string, nullable: true }
+        key: { type: string }
+        label: { type: string }
+        data_type: { type: string, enum: [decimal, integer, text, boolean, date] }
+        min_value: { type: number, nullable: true }
+        max_value: { type: number, nullable: true }
+        required: { type: boolean }
+        default_value: { type: string, nullable: true }
+        group: { type: string, nullable: true }
+        order_index: { type: integer }
+        is_active: { type: boolean }
