@@ -3,6 +3,10 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase admin client not configured' }, { status: 500 })
+    }
+
     // Get existing users from auth
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
     

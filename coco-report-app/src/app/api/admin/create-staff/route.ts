@@ -3,6 +3,10 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase admin client not configured' }, { status: 500 })
+    }
+
     // Create staff user
     const { data: staffUser, error: staffError } = await supabaseAdmin.auth.admin.createUser({
       email: 'staff@example.com',

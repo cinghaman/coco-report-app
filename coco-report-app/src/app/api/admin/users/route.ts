@@ -3,6 +3,10 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function GET() {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase admin client not configured' }, { status: 500 })
+    }
+
     // Get all users from the users table
     const { data: users, error: usersError } = await supabaseAdmin
       .from('users')
@@ -40,6 +44,10 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase admin client not configured' }, { status: 500 })
+    }
+
     const { email, password, display_name, role, venue_ids } = await request.json()
 
     // Validate required fields
@@ -86,6 +94,10 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase admin client not configured' }, { status: 500 })
+    }
+
     const { userId, display_name, role, venue_ids, password } = await request.json()
 
     if (!userId) {
@@ -131,6 +143,10 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase admin client not configured' }, { status: 500 })
+    }
+
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
 

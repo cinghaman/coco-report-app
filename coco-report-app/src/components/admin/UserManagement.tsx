@@ -47,6 +47,10 @@ export default function UserManagement({ user }: UserManagementProps) {
     try {
       setLoading(true)
 
+      if (!supabase) {
+        throw new Error('Supabase client not configured')
+      }
+
       // Fetch venues
       const { data: venuesData, error: venuesError } = await supabase
         .from('venues')

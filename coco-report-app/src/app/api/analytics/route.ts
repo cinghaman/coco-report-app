@@ -4,6 +4,10 @@ import { cache, generateCacheKey } from '@/lib/cache'
 
 export async function POST(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase admin client not configured' }, { status: 500 })
+    }
+
     const { startDate, endDate, userId, userRole, venueId } = await request.json()
 
     if (!startDate || !endDate) {

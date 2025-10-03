@@ -142,6 +142,10 @@ export default function EODForm({ user, initialData }: EODFormProps) {
 
   const fetchVenues = async () => {
     try {
+      if (!supabase) {
+        throw new Error('Supabase client not configured')
+      }
+      
       const { data, error } = await supabase
         .from('venues')
         .select('*')
@@ -170,6 +174,10 @@ export default function EODForm({ user, initialData }: EODFormProps) {
 
   const fetchPreviousDayCash = async () => {
     try {
+      if (!supabase) {
+        throw new Error('Supabase client not configured')
+      }
+      
       const { data, error } = await supabase.rpc('fn_prev_day_cash', {
         p_venue: formData.venue_id,
         p_date: formData.for_date
@@ -187,6 +195,10 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     if (!initialData?.id) return
 
     try {
+      if (!supabase) {
+        throw new Error('Supabase client not configured')
+      }
+      
       const { data, error } = await supabase
         .from('report_withdrawals')
         .select('*')
@@ -300,6 +312,10 @@ export default function EODForm({ user, initialData }: EODFormProps) {
 
     setSaving(true)
     try {
+      if (!supabase) {
+        throw new Error('Supabase client not configured')
+      }
+
       const reportData: Partial<DailyReport> = {
         ...formData,
         status: status === 'submitted' ? 'approved' : status, // Auto-approve submitted reports

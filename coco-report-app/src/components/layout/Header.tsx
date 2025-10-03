@@ -16,6 +16,10 @@ export default function Header({ user }: HeaderProps) {
 
   const handleSignOut = async () => {
     try {
+      if (!supabase) {
+        throw new Error('Supabase client not configured')
+      }
+      
       await supabase.auth.signOut()
       router.push('/login')
     } catch (error) {

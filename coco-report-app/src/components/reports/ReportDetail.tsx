@@ -28,6 +28,10 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
     try {
       setLoading(true)
       
+      if (!supabase) {
+        throw new Error('Supabase client not configured')
+      }
+      
       const { data: reportData, error: reportError } = await supabase
         .from('daily_reports')
         .select(`

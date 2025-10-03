@@ -29,6 +29,10 @@ export default function DashboardContent({ user }: DashboardContentProps) {
     try {
       setLoading(true)
 
+      if (!supabase) {
+        throw new Error('Supabase client not configured')
+      }
+
       // Fetch venues
       const { data: allVenuesData, error: venuesError } = await supabase
         .from('venues')

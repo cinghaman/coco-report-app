@@ -99,6 +99,10 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
 
   const fetchVenues = useCallback(async () => {
     try {
+      if (!supabase) {
+        throw new Error('Supabase client not configured')
+      }
+      
       const { data, error } = await supabase
         .from('venues')
         .select('*')
