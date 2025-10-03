@@ -20,11 +20,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Only match API routes and protected pages
-    '/api/:path*',
-    '/dashboard/:path*',
-    '/admin/:path*',
-    '/reports/:path*',
-    '/analytics/:path*'
+    // Only match API routes - let pages handle their own auth
+    '/api/:path*'
   ],
 }
