@@ -4,6 +4,12 @@ import { createBrowserClient } from '@supabase/ssr'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+// Debug logging
+console.log('Supabase client initialization:', {
+  url: supabaseUrl ? 'SET' : 'NOT SET',
+  key: supabaseAnonKey ? 'SET' : 'NOT SET'
+})
+
 // Client-side Supabase client (only create if env vars are available)
 export const supabase = supabaseUrl && supabaseAnonKey 
   ? createClient(supabaseUrl, supabaseAnonKey)

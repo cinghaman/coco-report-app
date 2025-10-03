@@ -15,9 +15,19 @@ export default function LoginPage() {
   // Check if user is already authenticated
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        router.push('/dashboard')
+      if (!supabase) {
+        console.error('Supabase client not available')
+        return
+      }
+      
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (session) {
+          router.push('/dashboard')
+        }
+      } catch (error) {
+        console.error('Auth check error:', error)
       }
     }
     checkAuth()
@@ -29,6 +39,12 @@ export default function LoginPage() {
     setError('')
     setMessage('')
 
+    if (!supabase) {
+      setError('Supabase client not available')
+      setLoading(false)
+      return
+    }
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -39,14 +55,14 @@ export default function LoginPage() {
         throw error
       }
 
-        if (data.user) {
-          setMessage('✅ Successfully signed in! Redirecting...')
-          
-          // Use Next.js router for navigation
-          setTimeout(() => {
-            router.push('/dashboard')
-          }, 1000)
-        }
+      if (data.user) {
+        setMessage('✅ Successfully signed in! Redirecting...')
+        
+        // Use Next.js router for navigation
+        setTimeout(() => {
+          router.push('/dashboard')
+        }, 1000)
+      }
     } catch (error) {
       console.error('Login error:', error)
       setError(`Login failed: ${error instanceof Error ? error.message : 'Unknown error'}`)

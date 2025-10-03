@@ -17,7 +17,13 @@ export default function DashboardPage() {
     // Simple auth check - just redirect if no user
     const checkAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        if (!supabase) {
+          console.error('Supabase client not available')
+          router.push('/login')
+          return
+        }
+
+        const { data: { session }, error } = await supabase.auth.getSession()
         
         if (!session) {
           router.push('/login')
@@ -27,11 +33,17 @@ export default function DashboardPage() {
         setUser(session.user)
 
         // Get user profile
-        const { data: userProfile } = await supabase
+        const { data: userProfile, error: profileError } = await supabase
           .from('users')
           .select('*')
           .eq('id', session.user.id)
           .single()
+
+        if (profileError) {
+          console.error('Profile fetch error:', profileError)
+          router.push('/login')
+          return
+        }
 
         setProfile(userProfile)
       } catch (error) {
@@ -43,7 +55,7 @@ export default function DashboardPage() {
     }
 
     checkAuth()
-  }, [])
+  }, [router])
 
   if (loading) {
     return (
