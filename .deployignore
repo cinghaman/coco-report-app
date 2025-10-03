@@ -1,9 +1,20 @@
-# Ignore root package.json during deployment
 package.json
 package-lock.json
 node_modules/
-README.md
+.git/
+.env
+.env.local
+.env.development
+.env.production
+.vercel/
+vercel.json
 sprints.md
-openapi.yaml
 supabase_schema.sql
+seed_report.sql
+get_user_id.sql
 edge-function-append-csv.ts
+openapi.yaml
+*.js
+*.sql
+*.tmp
+*.temp
