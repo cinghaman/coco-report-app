@@ -1,4 +1,13 @@
 {
+  "name": "coco-sales-system",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd coco-reporting-app && npm run build",
+    "start": "cd coco-reporting-app && npm run start",
+    "dev": "cd coco-reporting-app && npm run dev",
+    "install:app": "cd coco-reporting-app && npm install"
+  },
   "dependencies": {
     "dotenv": "^17.2.3"
   }
