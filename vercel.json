@@ -1,7 +1,0 @@
-{
-  "buildCommand": "cd coco-reporting-app && npm ci && npm run build",
-  "outputDirectory": "coco-reporting-app/.next",
-  "installCommand": "cd coco-reporting-app && npm ci",
-  "framework": "nextjs",
-  "rootDirectory": "coco-reporting-app"
-}
