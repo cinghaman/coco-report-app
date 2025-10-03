@@ -46,7 +46,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Completely disable middleware to stop infinite loops
-    // We'll handle auth on individual pages
+    // Skip all internal paths (_next)
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 }

@@ -129,17 +129,6 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     }
   }, [initialData])
 
-  useEffect(() => {
-    if (formData.venue_id && formData.for_date) {
-      fetchPreviousDayCash()
-    }
-  }, [formData.venue_id, formData.for_date, fetchPreviousDayCash])
-
-  // Update formData withdrawal when withdrawals change
-  useEffect(() => {
-    setFormData(prev => ({ ...prev, withdrawal: getTotalWithdrawals() }))
-  }, [withdrawals, getTotalWithdrawals])
-
   const fetchVenues = async () => {
     try {
       if (!supabase) {
@@ -306,6 +295,17 @@ export default function EODForm({ user, initialData }: EODFormProps) {
   const getTotalWithdrawals = () => {
     return withdrawals.reduce((sum, w) => sum + w.amount, 0)
   }
+
+  useEffect(() => {
+    if (formData.venue_id && formData.for_date) {
+      fetchPreviousDayCash()
+    }
+  }, [formData.venue_id, formData.for_date])
+
+  // Update formData withdrawal when withdrawals change
+  useEffect(() => {
+    setFormData(prev => ({ ...prev, withdrawal: getTotalWithdrawals() }))
+  }, [withdrawals])
 
   const handleSave = async (status: 'draft' | 'submitted') => {
     if (!validateForm()) return
