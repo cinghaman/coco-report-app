@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { User } from '@/lib/supabase'
 import Header from '@/components/layout/Header'
 import DashboardContent from '@/components/dashboard/DashboardContent'
 
 export default function DashboardPage() {
+  const router = useRouter()
   const [user, setUser] = useState<unknown>(null)
   const [profile, setProfile] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -18,7 +20,7 @@ export default function DashboardPage() {
         const { data: { session } } = await supabase.auth.getSession()
         
         if (!session) {
-          window.location.href = '/login'
+          router.push('/login')
           return
         }
 
@@ -34,7 +36,7 @@ export default function DashboardPage() {
         setProfile(userProfile)
       } catch (error) {
         console.error('Auth error:', error)
-        window.location.href = '/login'
+        router.push('/login')
       } finally {
         setLoading(false)
       }

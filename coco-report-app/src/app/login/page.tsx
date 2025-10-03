@@ -1,14 +1,27 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+
+  // Check if user is already authenticated
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        router.push('/dashboard')
+      }
+    }
+    checkAuth()
+  }, [router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,9 +42,9 @@ export default function LoginPage() {
         if (data.user) {
           setMessage('✅ Successfully signed in! Redirecting...')
           
-          // Simple redirect - let the destination page handle auth
+          // Use Next.js router for navigation
           setTimeout(() => {
-            window.location.href = '/dashboard'
+            router.push('/dashboard')
           }, 1000)
         }
     } catch (error) {
