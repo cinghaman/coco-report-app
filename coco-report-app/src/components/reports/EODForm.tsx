@@ -25,16 +25,13 @@ interface FormData {
   pyszne: number
   bolt: number
   total_sale_with_special_payment: number
-  // Representation
-  representation_note: string
-  representation_amount: number
+  // Other
   strata_loss: number
   flavour: number
   // Cash management
   withdrawal: number
   locker_withdrawal: number
   deposit: number
-  representacja: number
   staff_cost: number
   // Tips and cash
   tips_cash: number
@@ -61,6 +58,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
   const [reportId] = useState<string | null>(initialData?.id as string || null)
   const [displayValues, setDisplayValues] = useState<Record<string, string>>({})
   const [withdrawals, setWithdrawals] = useState<Array<{id: string, amount: number, reason: string}>>([{id: '1', amount: 0, reason: ''}])
+  const [representacja1, setRepresentacja1] = useState<Array<{id: string, amount: number, reason: string}>>([{id: '1', amount: 0, reason: ''}])
 
   const [formData, setFormData] = useState<FormData>({
     venue_id: (initialData?.venue_id as string) || '',
@@ -76,14 +74,11 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     pyszne: (initialData?.pyszne as number) || 0,
     bolt: (initialData?.bolt as number) || 0,
     total_sale_with_special_payment: (initialData?.total_sale_with_special_payment as number) || 0,
-    representation_note: (initialData?.representation_note as string) || '',
-    representation_amount: (initialData?.representation_amount as number) || 0,
     strata_loss: (initialData?.strata_loss as number) || 0,
     flavour: (initialData?.flavour as number) || 0,
     withdrawal: (initialData?.withdrawal as number) || 0,
     locker_withdrawal: (initialData?.locker_withdrawal as number) || 0,
     deposit: (initialData?.deposit as number) || 0,
-    representacja: (initialData?.representacja as number) || 0,
     staff_cost: (initialData?.staff_cost as number) || 0,
     tips_cash: (initialData?.tips_cash as number) || 0,
     tips_card: (initialData?.tips_card as number) || 0,
@@ -101,6 +96,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     fetchVenues()
     if (initialData) {
       fetchWithdrawals()
+      fetchRepresentacja1()
     }
   }, [initialData])
 
@@ -112,9 +108,9 @@ export default function EODForm({ user, initialData }: EODFormProps) {
       // Initialize display values for all number fields
       const numberFields = [
         'total_sale_gross', 'card_1', 'card_2', 'cash', 'przelew', 'glovo', 'uber', 
-        'wolt', 'pyszne', 'bolt', 'total_sale_with_special_payment', 'representation_amount',
+        'wolt', 'pyszne', 'bolt', 'total_sale_with_special_payment',
         'strata_loss', 'flavour', 'withdrawal', 'locker_withdrawal', 'deposit', 
-        'representacja', 'staff_cost', 'tips_cash', 'tips_card', 'cash_in_envelope_after_tips',
+        'staff_cost', 'tips_cash', 'tips_card', 'cash_in_envelope_after_tips',
         'left_in_drawer', 'total_cash_in_locker', 'serwis', 'serwis_k', 'company', 'voids'
       ]
       
@@ -214,6 +210,40 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     }
   }
 
+  const fetchRepresentacja1 = async () => {
+    if (!initialData?.id) return
+
+    try {
+      if (!supabase) {
+        throw new Error('Supabase client not configured')
+      }
+      
+      const { data, error } = await supabase
+        .from('report_representacja_1')
+        .select('*')
+        .eq('report_id', initialData.id)
+        .order('created_at')
+
+      if (error) throw error
+
+      if (data && data.length > 0) {
+        const representacja1Data = data.map(r => ({
+          id: r.id,
+          amount: r.amount,
+          reason: r.reason || ''
+        }))
+        setRepresentacja1(representacja1Data)
+      } else {
+        // If no representacja1 found, keep the default empty entry
+        setRepresentacja1([{id: '1', amount: 0, reason: ''}])
+      }
+    } catch (error) {
+      console.error('Error fetching representacja1:', error)
+      // Keep default entry on error
+      setRepresentacja1([{id: '1', amount: 0, reason: ''}])
+    }
+  }
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
@@ -227,17 +257,6 @@ export default function EODForm({ user, initialData }: EODFormProps) {
 
     if (formData.total_sale_gross <= 0) {
       newErrors.total_sale_gross = 'Total sales must be greater than 0'
-    }
-
-    // Validate that payments sum equals total sales (with tolerance)
-    const totalPayments = formData.card_1 + formData.card_2 + formData.cash + 
-                         formData.przelew + formData.glovo + formData.uber + 
-                         formData.wolt + formData.pyszne + formData.bolt + 
-                         formData.total_sale_with_special_payment
-
-    const difference = Math.abs(totalPayments - formData.total_sale_gross)
-    if (difference > 0.50) {
-      newErrors.payment_sum = `Payment sum (${totalPayments.toFixed(2)} PLN) doesn't match total sales (${formData.total_sale_gross.toFixed(2)} PLN). Difference: ${difference.toFixed(2)} PLN`
     }
 
     setErrors(newErrors)
@@ -296,6 +315,27 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     return withdrawals.reduce((sum, w) => sum + w.amount, 0)
   }
 
+  const addRepresentacja1 = () => {
+    const newId = Date.now().toString()
+    setRepresentacja1(prev => [...prev, {id: newId, amount: 0, reason: ''}])
+  }
+
+  const removeRepresentacja1 = (id: string) => {
+    if (representacja1.length > 1) {
+      setRepresentacja1(prev => prev.filter(r => r.id !== id))
+    }
+  }
+
+  const updateRepresentacja1 = (id: string, field: 'amount' | 'reason', value: string | number) => {
+    setRepresentacja1(prev => prev.map(r => 
+      r.id === id ? { ...r, [field]: value } : r
+    ))
+  }
+
+  const getTotalRepresentacja1 = () => {
+    return representacja1.reduce((sum, r) => sum + r.amount, 0)
+  }
+
   useEffect(() => {
     if (formData.venue_id && formData.for_date) {
       fetchPreviousDayCash()
@@ -306,6 +346,17 @@ export default function EODForm({ user, initialData }: EODFormProps) {
   useEffect(() => {
     setFormData(prev => ({ ...prev, withdrawal: getTotalWithdrawals() }))
   }, [withdrawals])
+
+  // Auto-calculate total_sale_gross when payment fields or representacja1 change
+  useEffect(() => {
+    const calculatedTotal = formData.card_1 + formData.card_2 + formData.cash + 
+                           formData.przelew + formData.glovo + formData.uber + 
+                           formData.wolt + formData.pyszne + formData.bolt + 
+                           formData.total_sale_with_special_payment + getTotalRepresentacja1()
+    setFormData(prev => ({ ...prev, total_sale_gross: calculatedTotal }))
+  }, [formData.card_1, formData.card_2, formData.cash, formData.przelew, 
+      formData.glovo, formData.uber, formData.wolt, formData.pyszne, 
+      formData.bolt, formData.total_sale_with_special_payment, representacja1])
 
   const handleSave = async (status: 'draft' | 'submitted') => {
     if (!validateForm()) return
@@ -385,14 +436,37 @@ export default function EODForm({ user, initialData }: EODFormProps) {
 
           if (withdrawalsError) throw withdrawalsError
         }
+
+        // Save representacja1 entries
+        if (initialData) {
+          await supabase
+            .from('report_representacja_1')
+            .delete()
+            .eq('report_id', data.id)
+        }
+
+        // Insert new representacja1 entries
+        const representacja1ToSave = representacja1.filter(r => r.amount > 0 || r.reason.trim())
+        if (representacja1ToSave.length > 0) {
+          const { error: representacja1Error } = await supabase
+            .from('report_representacja_1')
+            .insert(
+              representacja1ToSave.map(r => ({
+                report_id: data.id,
+                amount: r.amount,
+                reason: r.reason.trim() || null
+              }))
+            )
+
+          if (representacja1Error) throw representacja1Error
+        }
       }
 
       if (initialData) {
         // For edits, redirect back to the report detail page
         router.push(`/reports/${initialData.id}`)
       } else {
-        // For new reports, set the report ID and redirect
-        setReportId(data.id)
+        // For new reports, redirect to the report detail page
         router.push(`/reports/${data.id}`)
       }
     } catch (error) {
@@ -508,8 +582,16 @@ export default function EODForm({ user, initialData }: EODFormProps) {
           <div className="border-t border-gray-200 pt-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Sales & Payments</h3>
             
+            {/* Auto-calculated Total Sales Display */}
+            <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-md">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-emerald-800">Total Sales (Gross) - Auto Calculated:</span>
+                <span className="text-2xl font-bold text-emerald-900">{formatCurrency(formData.total_sale_gross)}</span>
+              </div>
+              <p className="text-xs text-emerald-700 mt-1">Sum of all payment methods below</p>
+            </div>
+
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {renderNumberInput('total_sale_gross', 'Total Sales (Gross)', true)}
               {renderNumberInput('card_1', 'Card 1')}
               {renderNumberInput('card_2', 'Card 2')}
               {renderNumberInput('cash', 'Cash')}
@@ -519,23 +601,81 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               {renderNumberInput('wolt', 'Wolt')}
               {renderNumberInput('pyszne', 'Pyszne')}
               {renderNumberInput('bolt', 'Bolt')}
-              {renderNumberInput('total_sale_with_special_payment', 'Special Payment')}
+              {renderNumberInput('total_sale_with_special_payment', 'Representacja 2')}
             </div>
 
-            {errors.payment_sum && (
-              <div className="mt-4 bg-red-50 border border-red-200 rounded-md p-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
+            {/* Dynamic Representacja 1 */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-md font-medium text-gray-800">Representacja 1</h4>
+                <button
+                  type="button"
+                  onClick={addRepresentacja1}
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Add Representacja 1
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                {representacja1.map((item, index) => (
+                  <div key={item.id} className="flex items-center space-x-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Representacja 1 #{index + 1}
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <input
+                            type="text"
+                            value={displayValues[`representacja1_${item.id}_amount`] || ''}
+                            onChange={(e) => {
+                              setDisplayValues(prev => ({ ...prev, [`representacja1_${item.id}_amount`]: e.target.value }))
+                              updateRepresentacja1(item.id, 'amount', parseFloat(e.target.value) || 0)
+                            }}
+                            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-gray-900 placeholder-gray-500"
+                            placeholder="Amount"
+                          />
+                        </div>
+                        <div>
+                          <input
+                            type="text"
+                            value={item.reason}
+                            onChange={(e) => updateRepresentacja1(item.id, 'reason', e.target.value)}
+                            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-gray-900 placeholder-gray-500"
+                            placeholder="Reason"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      {representacja1.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeRepresentacja1(item.id)}
+                          className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-red-700">{errors.payment_sum}</p>
-                  </div>
+                ))}
+              </div>
+              
+              {/* Total Representacja 1 Display */}
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-blue-800">Total Representacja 1:</span>
+                  <span className="text-lg font-bold text-blue-900">{formatCurrency(getTotalRepresentacja1())}</span>
                 </div>
               </div>
-            )}
+            </div>
           </div>
 
             {/* Cash Management Section */}
@@ -619,7 +759,6 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {renderNumberInput('locker_withdrawal', 'Locker Withdrawal')}
                 {renderNumberInput('deposit', 'Deposit')}
-                {renderNumberInput('representacja', 'Representacja')}
                 {renderNumberInput('staff_cost', 'Staff Cost')}
               </div>
             </div>
@@ -648,29 +787,6 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               {renderNumberInput('voids', 'Voids')}
               {renderNumberInput('strata_loss', 'Strata/Loss')}
               {renderNumberInput('flavour', 'Flavour')}
-            </div>
-          </div>
-
-          {/* Representation Section */}
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Representation</h3>
-            
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {renderNumberInput('representation_amount', 'Representation Amount')}
-              
-              <div>
-                <label htmlFor="representation_note" className="block text-sm font-medium text-gray-700">
-                  Representation Note
-                </label>
-                <input
-                  type="text"
-                  id="representation_note"
-                  value={formData.representation_note}
-                  onChange={(e) => handleInputChange('representation_note', e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-gray-900 placeholder-gray-500"
-                  placeholder="Optional note about representation"
-                />
-              </div>
             </div>
           </div>
 

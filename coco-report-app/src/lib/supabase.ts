@@ -4,12 +4,6 @@ import { createBrowserClient } from '@supabase/ssr'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-// Debug logging
-console.log('Supabase client initialization:', {
-  url: supabaseUrl ? 'SET' : 'NOT SET',
-  key: supabaseAnonKey ? 'SET' : 'NOT SET'
-})
-
 // Client-side Supabase client (only create if env vars are available)
 export const supabase = supabaseUrl && supabaseAnonKey 
   ? createClient(supabaseUrl, supabaseAnonKey)
@@ -62,14 +56,11 @@ export interface DailyReport {
   pyszne: number
   bolt: number
   total_sale_with_special_payment: number
-  representation_note?: string
-  representation_amount: number
   strata_loss: number
   flavour: number
   withdrawal: number
   locker_withdrawal: number
   deposit: number
-  representacja: number
   staff_cost: number
   tips_cash: number
   tips_card: number
@@ -115,6 +106,22 @@ export interface ReportFieldValue {
   report_id: string
   field_definition_id: string
   value_text?: string
+}
+
+export interface Representacja1 {
+  id: string
+  report_id: string
+  amount: number
+  reason: string
+  created_at?: string
+}
+
+export interface Withdrawal {
+  id: string
+  report_id: string
+  amount: number
+  reason: string
+  created_at?: string
 }
 
 export interface AuditLog {

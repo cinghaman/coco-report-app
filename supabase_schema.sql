@@ -50,15 +50,12 @@ create table if not exists public.daily_reports (
   bolt numeric(12,2) not null default 0,
   total_sale_with_special_payment numeric(12,2) not null default 0,
 
-  representation_note text,
-  representation_amount numeric(12,2) not null default 0,
   strata_loss numeric(12,2) not null default 0,
   flavour numeric(12,2) not null default 0,
 
   withdrawal numeric(12,2) not null default 0,
   locker_withdrawal numeric(12,2) not null default 0,
   deposit numeric(12,2) not null default 0,
-  representacja numeric(12,2) not null default 0,
   staff_cost numeric(12,2) not null default 0,
 
   tips_cash numeric(12,2) not null default 0,
@@ -122,7 +119,25 @@ create table if not exists public.report_field_values (
   unique(report_id, field_definition_id)
 );
 
--- 6) Audit Logs
+-- 6) Report Withdrawals (dynamic withdrawals per report)
+create table if not exists public.report_withdrawals (
+  id uuid primary key default gen_random_uuid(),
+  report_id uuid not null references public.daily_reports(id) on delete cascade,
+  amount numeric(12,2) not null default 0,
+  reason text,
+  created_at timestamptz not null default now()
+);
+
+-- 7) Report Representacja 1 (dynamic representacja 1 entries per report)
+create table if not exists public.report_representacja_1 (
+  id uuid primary key default gen_random_uuid(),
+  report_id uuid not null references public.daily_reports(id) on delete cascade,
+  amount numeric(12,2) not null default 0,
+  reason text,
+  created_at timestamptz not null default now()
+);
+
+-- 8) Audit Logs
 create table if not exists public.audit_logs (
   id uuid primary key default gen_random_uuid(),
   entity text not null,
@@ -140,6 +155,8 @@ alter table public.users enable row level security;
 alter table public.daily_reports enable row level security;
 alter table public.field_definitions enable row level security;
 alter table public.report_field_values enable row level security;
+alter table public.report_withdrawals enable row level security;
+alter table public.report_representacja_1 enable row level security;
 alter table public.audit_logs enable row level security;
 
 -- Helper: current user role
@@ -229,6 +246,26 @@ with check (
   exists (select 1 from public.daily_reports r where r.id = report_id)
 );
 
+-- Withdrawals follow report access
+create policy p_withdrawals_rw on public.report_withdrawals
+for all to authenticated
+using (
+  exists (select 1 from public.daily_reports r where r.id = report_id)
+)
+with check (
+  exists (select 1 from public.daily_reports r where r.id = report_id)
+);
+
+-- Representacja 1 entries follow report access
+create policy p_representacja_1_rw on public.report_representacja_1
+for all to authenticated
+using (
+  exists (select 1 from public.daily_reports r where r.id = report_id)
+)
+with check (
+  exists (select 1 from public.daily_reports r where r.id = report_id)
+);
+
 -- Audit logs readable by admin/owner; insert by server via rpc
 create policy p_audit_logs_read on public.audit_logs
 for select to authenticated
@@ -265,6 +302,7 @@ declare
   cards numeric;
   sp numeric;
   locker_prev numeric;
+  total_representacja_1 numeric;
 begin
   select * into r from public.daily_reports where id = p_report;
   if not found then
@@ -282,19 +320,24 @@ begin
   cards := r.card_1 + r.card_2;
   sp := r.total_sale_with_special_payment;
 
+  -- Calculate total representacja_1
+  select coalesce(sum(amount), 0) into total_representacja_1
+  from public.report_representacja_1
+  where report_id = p_report;
+  
   -- payments sum
   return query
   select
     (r.card_1 + r.card_2 + r.cash + r.przelew + r.glovo + r.uber + r.wolt + r.pyszne + r.bolt) as sum_payments,
-    abs((r.card_1 + r.card_2 + r.cash + r.przelew + r.glovo + r.uber + r.wolt + r.pyszne + r.bolt + sp) - r.total_sale_gross) <= tolerance as payment_ok,
+    abs((r.card_1 + r.card_2 + r.cash + r.przelew + r.glovo + r.uber + r.wolt + r.pyszne + r.bolt + sp + total_representacja_1) - r.total_sale_gross) <= tolerance as payment_ok,
     -- cash expected
     (
-      r.cash_previous_day + r.cash + r.deposit - r.locker_withdrawal - r.tips_cash - r.staff_cost - r.representation_amount - r.flavour
+      r.cash_previous_day + r.cash + r.deposit - r.locker_withdrawal - r.tips_cash - r.staff_cost - total_representacja_1 - r.flavour
     ) as cash_expected,
     -- diff between expected and entered envelope+drawer (+ locker movement)
     (
       (
-        r.cash_previous_day + r.cash + r.deposit - r.locker_withdrawal - r.tips_cash - r.staff_cost - r.representation_amount - r.flavour
+        r.cash_previous_day + r.cash + r.deposit - r.locker_withdrawal - r.tips_cash - r.staff_cost - total_representacja_1 - r.flavour
       )
       - (r.cash_in_envelope_after_tips + r.left_in_drawer)
     ) as cash_diff,
@@ -386,7 +429,7 @@ BEGIN
     COALESCE(SUM(CASE WHEN dr.status = 'approved' THEN dr.strata_loss ELSE 0 END), 0) as loss,
     COALESCE(SUM(w.amount), 0) as withdrawals
   FROM public.daily_reports dr
-  LEFT JOIN public.withdrawals w ON dr.id = w.report_id AND dr.status = 'approved'
+  LEFT JOIN public.report_withdrawals w ON dr.id = w.report_id AND dr.status = 'approved'
   WHERE dr.for_date >= p_start_date 
     AND dr.for_date <= p_end_date
     AND (p_venue_id IS NULL OR dr.venue_id = p_venue_id)
@@ -412,8 +455,10 @@ CREATE INDEX IF NOT EXISTS idx_users_role ON public.users(role);
 CREATE INDEX IF NOT EXISTS idx_venues_active ON public.venues(is_active);
 
 -- Indexes for withdrawals table
-CREATE INDEX IF NOT EXISTS idx_withdrawals_report_id ON public.withdrawals(report_id);
-CREATE INDEX IF NOT EXISTS idx_withdrawals_date ON public.withdrawals(withdrawal_date DESC);
+CREATE INDEX IF NOT EXISTS idx_report_withdrawals_report_id ON public.report_withdrawals(report_id);
+
+-- Indexes for representacja_1 table
+CREATE INDEX IF NOT EXISTS idx_report_representacja_1_report_id ON public.report_representacja_1(report_id);
 
 -- === SEEDS (optional) ===
 insert into public.venues (name) values ('Coco Lounge') on conflict do nothing;

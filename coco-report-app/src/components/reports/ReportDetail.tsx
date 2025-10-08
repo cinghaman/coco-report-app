@@ -16,11 +16,18 @@ interface Withdrawal {
   reason: string
 }
 
+interface Representacja1 {
+  id: string
+  amount: number
+  reason: string
+}
+
 export default function ReportDetail({ reportId, user }: ReportDetailProps) {
   const router = useRouter()
   const [report, setReport] = useState<DailyReport | null>(null)
   const [venue, setVenue] = useState<Venue | null>(null)
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
+  const [representacja1, setRepresentacja1] = useState<Representacja1[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -72,9 +79,21 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
         console.error('Error fetching withdrawals:', withdrawalsError)
       }
 
+      // Fetch representacja1 entries for this report
+      const { data: representacja1Data, error: representacja1Error } = await supabase
+        .from('report_representacja_1')
+        .select('*')
+        .eq('report_id', reportId)
+        .order('created_at')
+
+      if (representacja1Error) {
+        console.error('Error fetching representacja1:', representacja1Error)
+      }
+
       setReport(reportData)
       setVenue(reportData.venues)
       setWithdrawals(withdrawalsData || [])
+      setRepresentacja1(representacja1Data || [])
     } catch (error) {
       console.error('Error fetching report:', error)
       setError('Failed to load report')
@@ -261,9 +280,37 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
               </dd>
             </div>
             <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Other Payments</dt>
+              <dt className="text-sm font-medium text-gray-500">Przelew</dt>
               <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {formatCurrency(report.przelew + report.total_sale_with_special_payment)}
+                {formatCurrency(report.przelew)}
+              </dd>
+            </div>
+            <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+              <dt className="text-sm font-medium text-gray-500">Representacja 2</dt>
+              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                {formatCurrency(report.total_sale_with_special_payment)}
+              </dd>
+            </div>
+            <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+              <dt className="text-sm font-medium text-gray-500">Representacja 1</dt>
+              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                {representacja1.length > 0 ? (
+                  <div className="space-y-2">
+                    {representacja1.map((item) => (
+                      <div key={item.id} className="flex justify-between items-center">
+                        <span>{formatCurrency(item.amount)}</span>
+                        {item.reason && (
+                          <span className="text-gray-500 text-xs">({item.reason})</span>
+                        )}
+                      </div>
+                    ))}
+                    <div className="border-t pt-2 font-medium">
+                      Total: {formatCurrency(representacja1.reduce((sum, r) => sum + r.amount, 0))}
+                    </div>
+                  </div>
+                ) : (
+                  formatCurrency(0)
+                )}
               </dd>
             </div>
           </dl>
@@ -360,29 +407,19 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
       </div>
 
       {/* Additional Information */}
-      {(report.notes || report.representation_note) && (
+      {report.notes && (
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           <div className="px-4 py-5 sm:px-6">
             <h3 className="text-lg leading-6 font-medium text-gray-900">Additional Information</h3>
           </div>
           <div className="border-t border-gray-200">
             <dl>
-              {report.representation_note && (
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Representation Note</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    {report.representation_note}
-                  </dd>
-                </div>
-              )}
-              {report.notes && (
-                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Notes</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    {report.notes}
-                  </dd>
-                </div>
-              )}
+              <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt className="text-sm font-medium text-gray-500">Notes</dt>
+                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                  {report.notes}
+                </dd>
+              </div>
             </dl>
           </div>
         </div>
