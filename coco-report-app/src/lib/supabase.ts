@@ -56,26 +56,18 @@ export interface DailyReport {
   pyszne: number
   bolt: number
   total_sale_with_special_payment: number
-  strata_loss: number
-  flavour: number
+  cash_deposits: number
+  drawer: number
   withdrawal: number
   locker_withdrawal: number
   deposit: number
   staff_cost: number
-  tips_cash: number
-  tips_card: number
-  cash_in_envelope_after_tips: number
-  left_in_drawer: number
-  total_cash_in_locker: number
-  serwis: number
-  serwis_k: number
-  company: number
-  voids: number
+  service_10_percent: number
+  staff_spent: number
   // Carryover & derived snapshots
   cash_previous_day: number
   calculated_cash_expected: number
   reconciliation_diff: number
-  notes?: string
   created_by: string
   submitted_at?: string
   approved_by?: string
@@ -117,6 +109,22 @@ export interface Representacja1 {
 }
 
 export interface Withdrawal {
+  id: string
+  report_id: string
+  amount: number
+  reason: string
+  created_at?: string
+}
+
+export interface ServiceKwotowy {
+  id: string
+  report_id: string
+  amount: number
+  reason: string
+  created_at?: string
+}
+
+export interface Strata {
   id: string
   report_id: string
   amount: number

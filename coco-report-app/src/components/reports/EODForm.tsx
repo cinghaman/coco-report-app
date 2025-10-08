@@ -18,6 +18,8 @@ interface FormData {
   card_1: number
   card_2: number
   cash: number
+  cash_deposits: number
+  drawer: number
   przelew: number
   glovo: number
   uber: number
@@ -25,27 +27,14 @@ interface FormData {
   pyszne: number
   bolt: number
   total_sale_with_special_payment: number
-  // Other
-  strata_loss: number
-  flavour: number
-  // Cash management
+  // Expenditure
   withdrawal: number
   locker_withdrawal: number
   deposit: number
   staff_cost: number
-  // Tips and cash
-  tips_cash: number
-  tips_card: number
-  cash_in_envelope_after_tips: number
-  left_in_drawer: number
-  total_cash_in_locker: number
-  // Services
-  serwis: number
-  serwis_k: number
-  company: number
-  voids: number
-  // Notes
-  notes: string
+  service_10_percent: number
+  // Management Info
+  staff_spent: number
 }
 
 export default function EODForm({ user, initialData }: EODFormProps) {
@@ -59,6 +48,8 @@ export default function EODForm({ user, initialData }: EODFormProps) {
   const [displayValues, setDisplayValues] = useState<Record<string, string>>({})
   const [withdrawals, setWithdrawals] = useState<Array<{id: string, amount: number, reason: string}>>([{id: '1', amount: 0, reason: ''}])
   const [representacja1, setRepresentacja1] = useState<Array<{id: string, amount: number, reason: string}>>([{id: '1', amount: 0, reason: ''}])
+  const [serviceKwotowy, setServiceKwotowy] = useState<Array<{id: string, amount: number, reason: string}>>([{id: '1', amount: 0, reason: ''}])
+  const [strata, setStrata] = useState<Array<{id: string, amount: number, reason: string}>>([{id: '1', amount: 0, reason: ''}])
 
   const [formData, setFormData] = useState<FormData>({
     venue_id: (initialData?.venue_id as string) || '',
@@ -67,6 +58,8 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     card_1: (initialData?.card_1 as number) || 0,
     card_2: (initialData?.card_2 as number) || 0,
     cash: (initialData?.cash as number) || 0,
+    cash_deposits: (initialData?.cash_deposits as number) || 0,
+    drawer: (initialData?.drawer as number) || 0,
     przelew: (initialData?.przelew as number) || 0,
     glovo: (initialData?.glovo as number) || 0,
     uber: (initialData?.uber as number) || 0,
@@ -74,22 +67,12 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     pyszne: (initialData?.pyszne as number) || 0,
     bolt: (initialData?.bolt as number) || 0,
     total_sale_with_special_payment: (initialData?.total_sale_with_special_payment as number) || 0,
-    strata_loss: (initialData?.strata_loss as number) || 0,
-    flavour: (initialData?.flavour as number) || 0,
     withdrawal: (initialData?.withdrawal as number) || 0,
     locker_withdrawal: (initialData?.locker_withdrawal as number) || 0,
     deposit: (initialData?.deposit as number) || 0,
     staff_cost: (initialData?.staff_cost as number) || 0,
-    tips_cash: (initialData?.tips_cash as number) || 0,
-    tips_card: (initialData?.tips_card as number) || 0,
-    cash_in_envelope_after_tips: (initialData?.cash_in_envelope_after_tips as number) || 0,
-    left_in_drawer: (initialData?.left_in_drawer as number) || 0,
-    total_cash_in_locker: (initialData?.total_cash_in_locker as number) || 0,
-    serwis: (initialData?.servis as number) || 0,
-    serwis_k: (initialData?.servis_k as number) || 0,
-    company: (initialData?.company as number) || 0,
-    voids: (initialData?.voids as number) || 0,
-    notes: (initialData?.notes as string) || ''
+    service_10_percent: (initialData?.service_10_percent as number) || 0,
+    staff_spent: (initialData?.staff_spent as number) || 0
   })
 
   useEffect(() => {
@@ -97,6 +80,8 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     if (initialData) {
       fetchWithdrawals()
       fetchRepresentacja1()
+      fetchServiceKwotowy()
+      fetchStrata()
     }
   }, [initialData])
 
@@ -107,11 +92,9 @@ export default function EODForm({ user, initialData }: EODFormProps) {
       
       // Initialize display values for all number fields
       const numberFields = [
-        'total_sale_gross', 'card_1', 'card_2', 'cash', 'przelew', 'glovo', 'uber', 
-        'wolt', 'pyszne', 'bolt', 'total_sale_with_special_payment',
-        'strata_loss', 'flavour', 'withdrawal', 'locker_withdrawal', 'deposit', 
-        'staff_cost', 'tips_cash', 'tips_card', 'cash_in_envelope_after_tips',
-        'left_in_drawer', 'total_cash_in_locker', 'serwis', 'serwis_k', 'company', 'voids'
+        'total_sale_gross', 'card_1', 'card_2', 'cash', 'cash_deposits', 'drawer',
+        'przelew', 'glovo', 'uber', 'wolt', 'pyszne', 'bolt', 'total_sale_with_special_payment',
+        'withdrawal', 'locker_withdrawal', 'deposit', 'staff_cost', 'service_10_percent', 'staff_spent'
       ]
       
       numberFields.forEach(field => {
@@ -234,13 +217,75 @@ export default function EODForm({ user, initialData }: EODFormProps) {
         }))
         setRepresentacja1(representacja1Data)
       } else {
-        // If no representacja1 found, keep the default empty entry
         setRepresentacja1([{id: '1', amount: 0, reason: ''}])
       }
     } catch (error) {
       console.error('Error fetching representacja1:', error)
-      // Keep default entry on error
       setRepresentacja1([{id: '1', amount: 0, reason: ''}])
+    }
+  }
+
+  const fetchServiceKwotowy = async () => {
+    if (!initialData?.id) return
+
+    try {
+      if (!supabase) {
+        throw new Error('Supabase client not configured')
+      }
+      
+      const { data, error } = await supabase
+        .from('report_service_kwotowy')
+        .select('*')
+        .eq('report_id', initialData.id)
+        .order('created_at')
+
+      if (error) throw error
+
+      if (data && data.length > 0) {
+        const serviceKwotowyData = data.map(s => ({
+          id: s.id,
+          amount: s.amount,
+          reason: s.reason || ''
+        }))
+        setServiceKwotowy(serviceKwotowyData)
+      } else {
+        setServiceKwotowy([{id: '1', amount: 0, reason: ''}])
+      }
+    } catch (error) {
+      console.error('Error fetching service kwotowy:', error)
+      setServiceKwotowy([{id: '1', amount: 0, reason: ''}])
+    }
+  }
+
+  const fetchStrata = async () => {
+    if (!initialData?.id) return
+
+    try {
+      if (!supabase) {
+        throw new Error('Supabase client not configured')
+      }
+      
+      const { data, error } = await supabase
+        .from('report_strata')
+        .select('*')
+        .eq('report_id', initialData.id)
+        .order('created_at')
+
+      if (error) throw error
+
+      if (data && data.length > 0) {
+        const strataData = data.map(s => ({
+          id: s.id,
+          amount: s.amount,
+          reason: s.reason || ''
+        }))
+        setStrata(strataData)
+      } else {
+        setStrata([{id: '1', amount: 0, reason: ''}])
+      }
+    } catch (error) {
+      console.error('Error fetching strata:', error)
+      setStrata([{id: '1', amount: 0, reason: ''}])
     }
   }
 
@@ -336,6 +381,48 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     return representacja1.reduce((sum, r) => sum + r.amount, 0)
   }
 
+  const addServiceKwotowy = () => {
+    const newId = Date.now().toString()
+    setServiceKwotowy(prev => [...prev, {id: newId, amount: 0, reason: ''}])
+  }
+
+  const removeServiceKwotowy = (id: string) => {
+    if (serviceKwotowy.length > 1) {
+      setServiceKwotowy(prev => prev.filter(s => s.id !== id))
+    }
+  }
+
+  const updateServiceKwotowy = (id: string, field: 'amount' | 'reason', value: string | number) => {
+    setServiceKwotowy(prev => prev.map(s => 
+      s.id === id ? { ...s, [field]: value } : s
+    ))
+  }
+
+  const getTotalServiceKwotowy = () => {
+    return serviceKwotowy.reduce((sum, s) => sum + s.amount, 0)
+  }
+
+  const addStrata = () => {
+    const newId = Date.now().toString()
+    setStrata(prev => [...prev, {id: newId, amount: 0, reason: ''}])
+  }
+
+  const removeStrata = (id: string) => {
+    if (strata.length > 1) {
+      setStrata(prev => prev.filter(s => s.id !== id))
+    }
+  }
+
+  const updateStrata = (id: string, field: 'amount' | 'reason', value: string | number) => {
+    setStrata(prev => prev.map(s => 
+      s.id === id ? { ...s, [field]: value } : s
+    ))
+  }
+
+  const getTotalStrata = () => {
+    return strata.reduce((sum, s) => sum + s.amount, 0)
+  }
+
   useEffect(() => {
     if (formData.venue_id && formData.for_date) {
       fetchPreviousDayCash()
@@ -347,16 +434,17 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     setFormData(prev => ({ ...prev, withdrawal: getTotalWithdrawals() }))
   }, [withdrawals])
 
-  // Auto-calculate total_sale_gross when payment fields or representacja1 change
+  // Auto-calculate total_sale_gross (excluding Representacja 1, including cash_deposits and drawer)
   useEffect(() => {
     const calculatedTotal = formData.card_1 + formData.card_2 + formData.cash + 
+                           formData.cash_deposits + formData.drawer +
                            formData.przelew + formData.glovo + formData.uber + 
                            formData.wolt + formData.pyszne + formData.bolt + 
-                           formData.total_sale_with_special_payment + getTotalRepresentacja1()
+                           formData.total_sale_with_special_payment
     setFormData(prev => ({ ...prev, total_sale_gross: calculatedTotal }))
-  }, [formData.card_1, formData.card_2, formData.cash, formData.przelew, 
-      formData.glovo, formData.uber, formData.wolt, formData.pyszne, 
-      formData.bolt, formData.total_sale_with_special_payment, representacja1])
+  }, [formData.card_1, formData.card_2, formData.cash, formData.cash_deposits, formData.drawer,
+      formData.przelew, formData.glovo, formData.uber, formData.wolt, formData.pyszne, 
+      formData.bolt, formData.total_sale_with_special_payment])
 
   const handleSave = async (status: 'draft' | 'submitted') => {
     if (!validateForm()) return
@@ -445,7 +533,6 @@ export default function EODForm({ user, initialData }: EODFormProps) {
             .eq('report_id', data.id)
         }
 
-        // Insert new representacja1 entries
         const representacja1ToSave = representacja1.filter(r => r.amount > 0 || r.reason.trim())
         if (representacja1ToSave.length > 0) {
           const { error: representacja1Error } = await supabase
@@ -459,6 +546,52 @@ export default function EODForm({ user, initialData }: EODFormProps) {
             )
 
           if (representacja1Error) throw representacja1Error
+        }
+
+        // Save service_kwotowy entries
+        if (initialData) {
+          await supabase
+            .from('report_service_kwotowy')
+            .delete()
+            .eq('report_id', data.id)
+        }
+
+        const serviceKwotowyToSave = serviceKwotowy.filter(s => s.amount > 0 || s.reason.trim())
+        if (serviceKwotowyToSave.length > 0) {
+          const { error: serviceKwotowyError } = await supabase
+            .from('report_service_kwotowy')
+            .insert(
+              serviceKwotowyToSave.map(s => ({
+                report_id: data.id,
+                amount: s.amount,
+                reason: s.reason.trim() || null
+              }))
+            )
+
+          if (serviceKwotowyError) throw serviceKwotowyError
+        }
+
+        // Save strata entries
+        if (initialData) {
+          await supabase
+            .from('report_strata')
+            .delete()
+            .eq('report_id', data.id)
+        }
+
+        const strataToSave = strata.filter(s => s.amount > 0 || s.reason.trim())
+        if (strataToSave.length > 0) {
+          const { error: strataError } = await supabase
+            .from('report_strata')
+            .insert(
+              strataToSave.map(s => ({
+                report_id: data.id,
+                amount: s.amount,
+                reason: s.reason.trim() || null
+              }))
+            )
+
+          if (strataError) throw strataError
         }
       }
 
@@ -595,6 +728,8 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               {renderNumberInput('card_1', 'Card 1')}
               {renderNumberInput('card_2', 'Card 2')}
               {renderNumberInput('cash', 'Cash')}
+              {renderNumberInput('cash_deposits', 'Cash Deposits')}
+              {renderNumberInput('drawer', 'Drawer')}
               {renderNumberInput('przelew', 'Przelew')}
               {renderNumberInput('glovo', 'Glovo')}
               {renderNumberInput('uber', 'Uber')}
@@ -604,83 +739,11 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               {renderNumberInput('total_sale_with_special_payment', 'Representacja 2')}
             </div>
 
-            {/* Dynamic Representacja 1 */}
-            <div className="mt-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-md font-medium text-gray-800">Representacja 1</h4>
-                <button
-                  type="button"
-                  onClick={addRepresentacja1}
-                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
-                >
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  Add Representacja 1
-                </button>
-              </div>
-              
-              <div className="space-y-4">
-                {representacja1.map((item, index) => (
-                  <div key={item.id} className="flex items-center space-x-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Representacja 1 #{index + 1}
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <input
-                            type="text"
-                            value={displayValues[`representacja1_${item.id}_amount`] || ''}
-                            onChange={(e) => {
-                              setDisplayValues(prev => ({ ...prev, [`representacja1_${item.id}_amount`]: e.target.value }))
-                              updateRepresentacja1(item.id, 'amount', parseFloat(e.target.value) || 0)
-                            }}
-                            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-gray-900 placeholder-gray-500"
-                            placeholder="Amount"
-                          />
-                        </div>
-                        <div>
-                          <input
-                            type="text"
-                            value={item.reason}
-                            onChange={(e) => updateRepresentacja1(item.id, 'reason', e.target.value)}
-                            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-gray-900 placeholder-gray-500"
-                            placeholder="Reason"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      {representacja1.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeRepresentacja1(item.id)}
-                          className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {/* Total Representacja 1 Display */}
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-blue-800">Total Representacja 1:</span>
-                  <span className="text-lg font-bold text-blue-900">{formatCurrency(getTotalRepresentacja1())}</span>
-                </div>
-              </div>
-            </div>
           </div>
 
-            {/* Cash Management Section */}
+            {/* Expenditure Section (formerly Cash Management) */}
             <div className="border-t border-gray-200 pt-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Cash Management</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Expenditure</h3>
               
               {/* Dynamic Withdrawals */}
               <div className="mb-6">
@@ -755,58 +818,293 @@ export default function EODForm({ user, initialData }: EODFormProps) {
                 </div>
               </div>
               
-              {/* Other Cash Management Fields */}
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {renderNumberInput('locker_withdrawal', 'Locker Withdrawal')}
-                {renderNumberInput('deposit', 'Deposit')}
-                {renderNumberInput('staff_cost', 'Staff Cost')}
+              {/* Service (Kwotowy) - Multiple Entries */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-md font-medium text-gray-800">Service (Kwotowy)</h4>
+                  <button
+                    type="button"
+                    onClick={addServiceKwotowy}
+                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Add Service
+                  </button>
+                </div>
+                
+                <div className="space-y-4">
+                  {serviceKwotowy.map((service, index) => (
+                    <div key={service.id} className="flex items-center space-x-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Service {index + 1}
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <input
+                              type="text"
+                              value={displayValues[`service_kwotowy_${service.id}_amount`] || ''}
+                              onChange={(e) => {
+                                setDisplayValues(prev => ({ ...prev, [`service_kwotowy_${service.id}_amount`]: e.target.value }))
+                                updateServiceKwotowy(service.id, 'amount', parseFloat(e.target.value) || 0)
+                              }}
+                              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-gray-900 placeholder-gray-500"
+                              placeholder="Amount"
+                            />
+                          </div>
+                          <div>
+                            <input
+                              type="text"
+                              value={service.reason}
+                              onChange={(e) => updateServiceKwotowy(service.id, 'reason', e.target.value)}
+                              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-gray-900 placeholder-gray-500"
+                              placeholder="Reason"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        {serviceKwotowy.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeServiceKwotowy(service.id)}
+                            className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-md">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-purple-800">Total Service (Kwotowy):</span>
+                    <span className="text-lg font-bold text-purple-900">{formatCurrency(getTotalServiceKwotowy())}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Service (10%) - Single Field */}
+              <div className="mb-6">
+                {renderNumberInput('service_10_percent', 'Service (10%)')}
               </div>
             </div>
 
-          {/* Tips Section */}
+          {/* Management Info Section (NEW) */}
           <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Tips & Cash Handling</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Management Info</h3>
             
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {renderNumberInput('tips_cash', 'Tips (Cash)')}
-              {renderNumberInput('tips_card', 'Tips (Card)')}
-              {renderNumberInput('cash_in_envelope_after_tips', 'Cash in Envelope (After Tips)')}
-              {renderNumberInput('left_in_drawer', 'Left in Drawer')}
-              {renderNumberInput('total_cash_in_locker', 'Total Cash in Locker')}
+            {/* Representacja 1 - Moved from Sales & Payments */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-md font-medium text-gray-800">Representacja 1</h4>
+                <button
+                  type="button"
+                  onClick={addRepresentacja1}
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Add Representacja 1
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                {representacja1.map((item, index) => (
+                  <div key={item.id} className="flex items-center space-x-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Representacja 1 #{index + 1}
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <input
+                            type="text"
+                            value={displayValues[`representacja1_${item.id}_amount`] || ''}
+                            onChange={(e) => {
+                              setDisplayValues(prev => ({ ...prev, [`representacja1_${item.id}_amount`]: e.target.value }))
+                              updateRepresentacja1(item.id, 'amount', parseFloat(e.target.value) || 0)
+                            }}
+                            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-gray-900 placeholder-gray-500"
+                            placeholder="Amount"
+                          />
+                        </div>
+                        <div>
+                          <input
+                            type="text"
+                            value={item.reason}
+                            onChange={(e) => updateRepresentacja1(item.id, 'reason', e.target.value)}
+                            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-gray-900 placeholder-gray-500"
+                            placeholder="Reason"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      {representacja1.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeRepresentacja1(item.id)}
+                          className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-blue-800">Total Representacja 1:</span>
+                  <span className="text-lg font-bold text-blue-900">{formatCurrency(getTotalRepresentacja1())}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Staff Spent - Single Field */}
+            <div className="mb-6">
+              {renderNumberInput('staff_spent', 'Staff Spent')}
+            </div>
+
+            {/* Strata - Multiple Entries */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-md font-medium text-gray-800">Strata</h4>
+                <button
+                  type="button"
+                  onClick={addStrata}
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Add Strata
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                {strata.map((item, index) => (
+                  <div key={item.id} className="flex items-center space-x-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Strata {index + 1}
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <input
+                            type="text"
+                            value={displayValues[`strata_${item.id}_amount`] || ''}
+                            onChange={(e) => {
+                              setDisplayValues(prev => ({ ...prev, [`strata_${item.id}_amount`]: e.target.value }))
+                              updateStrata(item.id, 'amount', parseFloat(e.target.value) || 0)
+                            }}
+                            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-gray-900 placeholder-gray-500"
+                            placeholder="Amount"
+                          />
+                        </div>
+                        <div>
+                          <input
+                            type="text"
+                            value={item.reason}
+                            onChange={(e) => updateStrata(item.id, 'reason', e.target.value)}
+                            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-gray-900 placeholder-gray-500"
+                            placeholder="Reason"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      {strata.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeStrata(item.id)}
+                          className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-red-800">Total Strata:</span>
+                  <span className="text-lg font-bold text-red-900">{formatCurrency(getTotalStrata())}</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Services Section */}
+          {/* Mini Calculations Section (NEW) */}
           <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Services & Other</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Mini Calculations</h3>
             
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {renderNumberInput('serwis', 'Serwis')}
-              {renderNumberInput('serwis_k', 'Serwis K')}
-              {renderNumberInput('company', 'Company')}
-              {renderNumberInput('voids', 'Voids')}
-              {renderNumberInput('strata_loss', 'Strata/Loss')}
-              {renderNumberInput('flavour', 'Flavour')}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {/* Total Service */}
+              <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                <div className="text-sm font-medium text-purple-700 mb-1">Total Service</div>
+                <div className="text-xl font-bold text-purple-900">
+                  {formatCurrency((getTotalServiceKwotowy() + formData.service_10_percent) * 0.75)}
+                </div>
+                <div className="text-xs text-purple-600 mt-1">
+                  (Service Kwotowy + Service 10%) × 0.75
+                </div>
+              </div>
+
+              {/* Total Card Payment */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="text-sm font-medium text-blue-700 mb-1">Total Card Payment</div>
+                <div className="text-xl font-bold text-blue-900">
+                  {formatCurrency(formData.card_1 + formData.card_2)}
+                </div>
+                <div className="text-xs text-blue-600 mt-1">
+                  Card 1 + Card 2
+                </div>
+              </div>
+
+              {/* Total Cash */}
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="text-sm font-medium text-green-700 mb-1">Total Cash</div>
+                <div className="text-xl font-bold text-green-900">
+                  {formatCurrency(
+                    formData.cash + formData.cash_deposits + formData.total_sale_with_special_payment + formData.drawer - 
+                    getTotalWithdrawals() - ((getTotalServiceKwotowy() + formData.service_10_percent) * 0.75)
+                  )}
+                </div>
+                <div className="text-xs text-green-600 mt-1">
+                  Cash + Cash Deposits + Representacja 2 + Drawer - Withdrawals - Total Service
+                </div>
+              </div>
+
+              {/* Total Income from Delivery Apps */}
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="text-sm font-medium text-orange-700 mb-1">Total Income from Delivery Apps</div>
+                <div className="text-xl font-bold text-orange-900">
+                  {formatCurrency(
+                    (formData.przelew + formData.glovo + formData.uber + formData.wolt + formData.pyszne + formData.bolt) * 0.70
+                  )}
+                </div>
+                <div className="text-xs text-orange-600 mt-1">
+                  (Przelew + Glovo + Uber + Wolt + Pyszne + Bolt) × 0.70
+                </div>
+              </div>
             </div>
           </div>
-
-          {/* Notes Section */}
-          <div className="border-t border-gray-200 pt-6">
-            <div>
-              <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
-                Notes
-              </label>
-              <textarea
-                id="notes"
-                rows={3}
-                value={formData.notes}
-                onChange={(e) => handleInputChange('notes', e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-gray-900 placeholder-gray-500"
-                placeholder="Additional notes or comments..."
-              />
-            </div>
-          </div>
-
 
           {/* Error Display */}
           {errors.submit && (

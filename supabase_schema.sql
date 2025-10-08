@@ -42,6 +42,8 @@ create table if not exists public.daily_reports (
   card_1 numeric(12,2) not null default 0,
   card_2 numeric(12,2) not null default 0,
   cash numeric(12,2) not null default 0,
+  cash_deposits numeric(12,2) not null default 0,
+  drawer numeric(12,2) not null default 0,
   przelew numeric(12,2) not null default 0,
   glovo numeric(12,2) not null default 0,
   uber numeric(12,2) not null default 0,
@@ -50,31 +52,17 @@ create table if not exists public.daily_reports (
   bolt numeric(12,2) not null default 0,
   total_sale_with_special_payment numeric(12,2) not null default 0,
 
-  strata_loss numeric(12,2) not null default 0,
-  flavour numeric(12,2) not null default 0,
-
   withdrawal numeric(12,2) not null default 0,
   locker_withdrawal numeric(12,2) not null default 0,
   deposit numeric(12,2) not null default 0,
   staff_cost numeric(12,2) not null default 0,
-
-  tips_cash numeric(12,2) not null default 0,
-  tips_card numeric(12,2) not null default 0,
-  cash_in_envelope_after_tips numeric(12,2) not null default 0,
-  left_in_drawer numeric(12,2) not null default 0,
-  total_cash_in_locker numeric(12,2) not null default 0,
-
-  serwis numeric(12,2) not null default 0,
-  serwis_k numeric(12,2) not null default 0,
-  company numeric(12,2) not null default 0,
-  voids numeric(12,2) not null default 0,
+  service_10_percent numeric(12,2) not null default 0,
+  staff_spent numeric(12,2) not null default 0,
 
   -- Carryover & derived snapshots
   cash_previous_day numeric(12,2) not null default 0,
   calculated_cash_expected numeric(12,2) not null default 0,
   reconciliation_diff numeric(12,2) not null default 0,
-
-  notes text,
 
   created_by uuid not null references public.users(id) on delete restrict,
   submitted_at timestamptz,
@@ -137,7 +125,25 @@ create table if not exists public.report_representacja_1 (
   created_at timestamptz not null default now()
 );
 
--- 8) Audit Logs
+-- 8) Report Service Kwotowy (dynamic service kwotowy entries per report)
+create table if not exists public.report_service_kwotowy (
+  id uuid primary key default gen_random_uuid(),
+  report_id uuid not null references public.daily_reports(id) on delete cascade,
+  amount numeric(12,2) not null default 0,
+  reason text,
+  created_at timestamptz not null default now()
+);
+
+-- 9) Report Strata (dynamic strata entries per report)
+create table if not exists public.report_strata (
+  id uuid primary key default gen_random_uuid(),
+  report_id uuid not null references public.daily_reports(id) on delete cascade,
+  amount numeric(12,2) not null default 0,
+  reason text,
+  created_at timestamptz not null default now()
+);
+
+-- 10) Audit Logs
 create table if not exists public.audit_logs (
   id uuid primary key default gen_random_uuid(),
   entity text not null,
@@ -157,6 +163,8 @@ alter table public.field_definitions enable row level security;
 alter table public.report_field_values enable row level security;
 alter table public.report_withdrawals enable row level security;
 alter table public.report_representacja_1 enable row level security;
+alter table public.report_service_kwotowy enable row level security;
+alter table public.report_strata enable row level security;
 alter table public.audit_logs enable row level security;
 
 -- Helper: current user role
@@ -258,6 +266,26 @@ with check (
 
 -- Representacja 1 entries follow report access
 create policy p_representacja_1_rw on public.report_representacja_1
+for all to authenticated
+using (
+  exists (select 1 from public.daily_reports r where r.id = report_id)
+)
+with check (
+  exists (select 1 from public.daily_reports r where r.id = report_id)
+);
+
+-- Service Kwotowy entries follow report access
+create policy p_service_kwotowy_rw on public.report_service_kwotowy
+for all to authenticated
+using (
+  exists (select 1 from public.daily_reports r where r.id = report_id)
+)
+with check (
+  exists (select 1 from public.daily_reports r where r.id = report_id)
+);
+
+-- Strata entries follow report access
+create policy p_strata_rw on public.report_strata
 for all to authenticated
 using (
   exists (select 1 from public.daily_reports r where r.id = report_id)
@@ -459,6 +487,12 @@ CREATE INDEX IF NOT EXISTS idx_report_withdrawals_report_id ON public.report_wit
 
 -- Indexes for representacja_1 table
 CREATE INDEX IF NOT EXISTS idx_report_representacja_1_report_id ON public.report_representacja_1(report_id);
+
+-- Indexes for service_kwotowy table
+CREATE INDEX IF NOT EXISTS idx_report_service_kwotowy_report_id ON public.report_service_kwotowy(report_id);
+
+-- Indexes for strata table
+CREATE INDEX IF NOT EXISTS idx_report_strata_report_id ON public.report_strata(report_id);
 
 -- === SEEDS (optional) ===
 insert into public.venues (name) values ('Coco Lounge') on conflict do nothing;
