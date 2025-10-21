@@ -7,6 +7,9 @@ import { cache, generateCacheKey } from '@/lib/cache'
 export async function POST(request: NextRequest) {
   try {
     if (!supabaseAdmin) {
+      console.error('Supabase admin client not configured. Check environment variables:')
+      console.error('NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'SET' : 'NOT SET')
+      console.error('SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET')
       return NextResponse.json({ error: 'Supabase admin client not configured' }, { status: 500 })
     }
 
@@ -182,6 +185,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result)
   } catch (error: unknown) {
     console.error('Error fetching analytics:', error)
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined
+    })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch analytics data' },
       { status: 500 }
