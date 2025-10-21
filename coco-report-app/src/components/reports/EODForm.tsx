@@ -39,6 +39,10 @@ interface FormData {
   // Revenue fields
   gross_revenue: number
   net_revenue: number
+  // Carryover & derived snapshots
+  cash_previous_day: number
+  calculated_cash_expected: number
+  reconciliation_diff: number
 }
 
 export default function EODForm({ user, initialData }: EODFormProps) {
@@ -80,7 +84,11 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     service_10_percent: (initialData?.service_10_percent as number) || 0,
     staff_spent: (initialData?.staff_spent as number) || 0,
     gross_revenue: (initialData?.gross_revenue as number) || 0,
-    net_revenue: (initialData?.net_revenue as number) || 0
+    net_revenue: (initialData?.net_revenue as number) || 0,
+    // Carryover & derived snapshots
+    cash_previous_day: (initialData?.cash_previous_day as number) || 0,
+    calculated_cash_expected: (initialData?.calculated_cash_expected as number) || 0,
+    reconciliation_diff: (initialData?.reconciliation_diff as number) || 0
   })
 
   useEffect(() => {
@@ -103,7 +111,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
         'total_sale_gross', 'card_1', 'card_2', 'cash', 'flavor', 'cash_deposits', 'drawer',
         'przelew', 'glovo', 'uber', 'wolt', 'pyszne', 'bolt', 'total_sale_with_special_payment',
         'withdrawal', 'locker_withdrawal', 'deposit', 'staff_cost', 'service_10_percent', 'staff_spent',
-        'gross_revenue', 'net_revenue'
+        'gross_revenue', 'net_revenue', 'cash_previous_day', 'calculated_cash_expected', 'reconciliation_diff'
       ]
       
       numberFields.forEach(field => {
