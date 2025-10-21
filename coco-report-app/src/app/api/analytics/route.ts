@@ -45,11 +45,33 @@ export async function POST(request: NextRequest) {
         p_venue_id: venueId || null
       })
 
-    if (analyticsError) throw analyticsError
+    if (analyticsError) {
+      console.error('Analytics function error:', analyticsError)
+      throw analyticsError
+    }
 
     const analytics = analyticsData?.[0]
     if (!analytics) {
-      throw new Error('No analytics data returned')
+      console.log('No analytics data returned for date range:', startDate, 'to', endDate)
+      // Return empty data structure instead of throwing error
+      const result = {
+        totalGrossSales: 0,
+        totalWithdrawals: 0,
+        totalTips: 0,
+        totalVoids: 0,
+        totalLoss: 0,
+        averageDailySales: 0,
+        averageDailyWithdrawals: 0,
+        totalGrossRevenue: 0,
+        totalNetRevenue: 0,
+        averageDailyGrossRevenue: 0,
+        averageDailyNetRevenue: 0,
+        totalReports: 0,
+        approvedReports: 0,
+        pendingReports: 0,
+        dailyData: []
+      }
+      return NextResponse.json(result)
     }
 
     const totalGrossSales = Number(analytics.total_gross_sales) || 0
@@ -70,7 +92,10 @@ export async function POST(request: NextRequest) {
         p_venue_id: venueId || null
       })
 
-    if (dailyAnalyticsError) throw dailyAnalyticsError
+    if (dailyAnalyticsError) {
+      console.error('Daily analytics function error:', dailyAnalyticsError)
+      throw dailyAnalyticsError
+    }
 
     // Calculate total withdrawals from daily data
     const totalWithdrawals = dailyAnalyticsData?.reduce((sum: number, day: { withdrawals: number }) => sum + (Number(day.withdrawals) || 0), 0) || 0
