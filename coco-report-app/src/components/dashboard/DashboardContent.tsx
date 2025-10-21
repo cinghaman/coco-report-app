@@ -16,7 +16,8 @@ export default function DashboardContent({ user }: DashboardContentProps) {
   const [venueStats, setVenueStats] = useState<Record<string, {
     totalReports: number
     approvedReports: number
-    totalSales: number
+    totalGrossRevenue: number
+    totalNetRevenue: number
   }>>({})
   
   // Pagination state
@@ -87,7 +88,8 @@ export default function DashboardContent({ user }: DashboardContentProps) {
       const venueStatsMap: Record<string, {
         totalReports: number
         approvedReports: number
-        totalSales: number
+        totalGrossRevenue: number
+        totalNetRevenue: number
       }> = {}
 
       // Use database aggregation for venue stats instead of fetching all reports
@@ -109,21 +111,23 @@ export default function DashboardContent({ user }: DashboardContentProps) {
 
         if (approvedError) throw approvedError
 
-        // Get total sales for approved reports only
-        const { data: salesData, error: salesError } = await supabase
+        // Get gross and net revenue for approved reports only
+        const { data: revenueData, error: revenueError } = await supabase
           .from('daily_reports')
-          .select('total_sale_gross')
+          .select('gross_revenue, net_revenue')
           .eq('venue_id', venue.id)
           .eq('status', 'approved')
 
-        if (salesError) throw salesError
+        if (revenueError) throw revenueError
 
-        const totalSales = salesData?.reduce((sum, r) => sum + (r.total_sale_gross || 0), 0) || 0
+        const totalGrossRevenue = revenueData?.reduce((sum, r) => sum + (r.gross_revenue || 0), 0) || 0
+        const totalNetRevenue = revenueData?.reduce((sum, r) => sum + (r.net_revenue || 0), 0) || 0
 
         venueStatsMap[venue.id] = {
           totalReports: totalReports || 0,
           approvedReports: approvedReports || 0,
-          totalSales
+          totalGrossRevenue,
+          totalNetRevenue
         }
       }
 
@@ -221,7 +225,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
       {user.role === 'admin' && (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           {venues.map((venue) => {
-            const stats = venueStats[venue.id] || { totalReports: 0, approvedReports: 0, totalSales: 0 }
+            const stats = venueStats[venue.id] || { totalReports: 0, approvedReports: 0, totalGrossRevenue: 0, totalNetRevenue: 0 }
             return (
               <div key={venue.id} className="bg-white overflow-hidden shadow rounded-lg">
                 <div className="p-5">
@@ -240,10 +244,12 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-2xl font-bold text-emerald-600">
-                        {formatCurrency(stats.totalSales)}
+                      <div className="text-xl font-bold text-emerald-600">
+                        {formatCurrency(stats.totalGrossRevenue)} gross
                       </div>
-                      <div className="text-sm text-gray-500">Total Sales</div>
+                      <div className="text-lg font-semibold text-blue-600">
+                        {formatCurrency(stats.totalNetRevenue)} net
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -306,13 +312,13 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-medium text-gray-900">
-                          {formatCurrency(report.gross_revenue || 0)}
+                          {formatCurrency(report.gross_revenue || 0)} gross
                         </div>
                         <div className="text-sm text-gray-500">
                           {formatCurrency(report.net_revenue || 0)} net
                         </div>
                         <div className="text-xs text-gray-400">
-                          {formatCurrency(calculateTotalCash(report))} total cash
+                          {formatCurrency(calculateTotalCash(report))} cash
                         </div>
                       </div>
                     </div>
