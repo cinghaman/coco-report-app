@@ -553,6 +553,32 @@ export default function EODForm({ user, initialData }: EODFormProps) {
 
       if (error) throw error
 
+      // Send email notification if report is submitted
+      if (status === 'submitted' && data.id) {
+        try {
+          const venue = venues.find(v => v.id === formData.venue_id)
+          const venueName = venue?.name || 'Unknown Venue'
+          
+          await fetch('/api/send-email', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              venueName,
+              forDate: formData.for_date,
+              submittedBy: user.display_name || user.email,
+              totalSales: formData.total_sale_gross,
+              grossRevenue: formData.gross_revenue,
+              netRevenue: formData.net_revenue,
+            }),
+          })
+        } catch (emailError) {
+          console.error('Failed to send email notification:', emailError)
+          // Don't fail the entire save operation if email fails
+        }
+      }
+
       // Save withdrawals to the new table
       if (data.id) {
         // First, delete existing withdrawals for this report (for updates)
