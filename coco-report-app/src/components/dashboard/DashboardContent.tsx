@@ -170,6 +170,21 @@ export default function DashboardContent({ user }: DashboardContentProps) {
     return new Date(dateString).toLocaleDateString('pl-PL')
   }
 
+  const calculateTotalCash = (report: DailyReport) => {
+    // Calculate total service kwotowy (we'll need to fetch this data separately for accurate calculation)
+    // For now, using service_10_percent as approximation
+    const totalService = (report.service_10_percent || 0) * 0.75
+    
+    // Total Cash formula: Cash + Flavor + Cash Deposits + Representacja 2 + Drawer - Withdrawals - Total Service
+    return (report.cash || 0) + 
+           (report.flavor || 0) + 
+           (report.cash_deposits || 0) + 
+           (report.drawer || 0) + 
+           (report.total_sale_with_special_payment || 0) - 
+           (report.withdrawal || 0) - 
+           totalService
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-yellow-100 text-yellow-800'
@@ -291,10 +306,13 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-medium text-gray-900">
-                          {formatCurrency(report.total_sale_gross)}
+                          {formatCurrency(report.gross_revenue || 0)}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {report.cash > 0 && `${formatCurrency(report.cash)} cash`}
+                          {formatCurrency(report.net_revenue || 0)} net
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {formatCurrency(calculateTotalCash(report))} total cash
                         </div>
                       </div>
                     </div>
