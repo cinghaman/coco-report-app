@@ -59,7 +59,6 @@ export interface DailyReport {
   total_sale_with_special_payment: number
   cash_deposits: number
   drawer: number
-  withdrawal: number
   locker_withdrawal: number
   deposit: number
   staff_cost: number
