@@ -182,9 +182,13 @@ export default function EODForm({ user, initialData }: EODFormProps) {
       if (error) throw error
       const drawerValue = data || 0
       setDrawerPreviousDay(drawerValue)
-      // Auto-populate the drawer field
-      setFormData(prev => ({ ...prev, drawer: drawerValue }))
-      setDisplayValues(prev => ({ ...prev, drawer: drawerValue.toString() }))
+      
+      // Only auto-populate the drawer field for non-admin users
+      // Admin users can edit this field manually
+      if (user.role !== 'admin') {
+        setFormData(prev => ({ ...prev, drawer: drawerValue }))
+        setDisplayValues(prev => ({ ...prev, drawer: drawerValue.toString() }))
+      }
     } catch (error) {
       console.error('Error fetching previous day drawer:', error)
       setDrawerPreviousDay(0)
@@ -710,6 +714,33 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     )
   }
 
+  const renderAdminEditableField = (field: keyof FormData, label: string) => {
+    const isAdmin = user.role === 'admin'
+    const displayValue = displayValues[field] || ''
+    
+    if (isAdmin) {
+      return (
+        <div>
+          <label htmlFor={field} className="block text-sm font-medium text-gray-700">
+            {label} <span className="text-xs text-gray-500">(Admin Editable)</span>
+          </label>
+          <input
+            type="number"
+            id={field}
+            value={displayValue}
+            onChange={(e) => handleInputChange(field, e.target.value)}
+            step="0.01"
+            min="0"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
+            placeholder="0.00"
+          />
+        </div>
+      )
+    } else {
+      return renderReadOnlyField(field, label)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -800,7 +831,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               {renderNumberInput('cash', 'Cash')}
               {renderNumberInput('flavor', 'Flavor')}
               {renderNumberInput('cash_deposits', 'Cash Deposits')}
-              {renderReadOnlyField('drawer', 'Locker + Drawer Previous')}
+              {renderAdminEditableField('drawer', 'Locker + Drawer Previous')}
               {renderNumberInput('przelew', 'Przelew')}
               {renderNumberInput('glovo', 'Glovo')}
               {renderNumberInput('uber', 'Uber')}
