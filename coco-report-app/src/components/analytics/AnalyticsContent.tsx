@@ -712,7 +712,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                 </div>
               )}
 
-              <div className="h-[600px]">
+              <div className="h-[70vh] min-h-[500px] max-h-[1000px]">
                 <ResponsiveContainer width="100%" height="100%">
                   {chartType === 'pie' ? (
                     <PieChart>
@@ -730,7 +730,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number) => `${value} zł`} />
+                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
                       <Legend />
                     </PieChart>
                   ) : chartType === 'bar' ? (
@@ -743,7 +743,18 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                         textAnchor="end"
                         height={80}
                       />
-                      <YAxis tickFormatter={(value) => `${value} zł`} />
+                      <YAxis 
+                        tickFormatter={(value) => {
+                          if (value >= 1000000) {
+                            return `${(value / 1000000).toFixed(1)}M zł`
+                          } else if (value >= 1000) {
+                            return `${(value / 1000).toFixed(0)}k zł`
+                          }
+                          return `${value} zł`
+                        }}
+                        domain={['dataMin', 'dataMax']}
+                        allowDataOverflow={false}
+                      />
                       <Tooltip content={<CustomTooltip />} />
                       <Legend />
                       <Bar dataKey="gross_revenue" fill="#10b981" name="Gross Revenue" />
@@ -763,7 +774,18 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                         textAnchor="end"
                         height={80}
                       />
-                      <YAxis tickFormatter={(value) => `${value} zł`} />
+                      <YAxis 
+                        tickFormatter={(value) => {
+                          if (value >= 1000000) {
+                            return `${(value / 1000000).toFixed(1)}M zł`
+                          } else if (value >= 1000) {
+                            return `${(value / 1000).toFixed(0)}k zł`
+                          }
+                          return `${value} zł`
+                        }}
+                        domain={['dataMin', 'dataMax']}
+                        allowDataOverflow={false}
+                      />
                       <Tooltip content={<CustomTooltip />} />
                       <Legend />
                       <Line 
