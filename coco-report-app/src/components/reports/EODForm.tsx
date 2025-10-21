@@ -29,6 +29,7 @@ interface FormData {
   bolt: number
   total_sale_with_special_payment: number
   // Expenditure
+  withdrawal: number
   locker_withdrawal: number
   deposit: number
   staff_cost: number
@@ -72,6 +73,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     pyszne: (initialData?.pyszne as number) || 0,
     bolt: (initialData?.bolt as number) || 0,
     total_sale_with_special_payment: (initialData?.total_sale_with_special_payment as number) || 0,
+    withdrawal: (initialData?.withdrawal as number) || 0,
     locker_withdrawal: (initialData?.locker_withdrawal as number) || 0,
     deposit: (initialData?.deposit as number) || 0,
     staff_cost: (initialData?.staff_cost as number) || 0,
@@ -100,7 +102,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
       const numberFields = [
         'total_sale_gross', 'card_1', 'card_2', 'cash', 'flavor', 'cash_deposits', 'drawer',
         'przelew', 'glovo', 'uber', 'wolt', 'pyszne', 'bolt', 'total_sale_with_special_payment',
-        'locker_withdrawal', 'deposit', 'staff_cost', 'service_10_percent', 'staff_spent',
+        'withdrawal', 'locker_withdrawal', 'deposit', 'staff_cost', 'service_10_percent', 'staff_spent',
         'gross_revenue', 'net_revenue'
       ]
       
