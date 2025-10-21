@@ -365,9 +365,8 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
     return [
       { name: 'Gross Revenue', value: analyticsData.totalGrossRevenue, color: '#10b981' },
       { name: 'Net Revenue', value: analyticsData.totalNetRevenue, color: '#3b82f6' },
-      { name: 'Tips', value: analyticsData.totalTips, color: '#f59e0b' },
+      { name: 'Sales', value: analyticsData.totalGrossSales, color: '#8b5cf6' },
       { name: 'Withdrawals', value: analyticsData.totalWithdrawals, color: '#ef4444' },
-      { name: 'Loss', value: analyticsData.totalLoss, color: '#8b5cf6' },
     ].filter(item => item.value > 0)
   }
 
@@ -637,30 +636,6 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
 
             </div>
 
-            {/* Reports Status */}
-            <div className="grid grid-cols-1 gap-6 mb-8">
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                      </div>
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">Reports Status</dt>
-                        <dd className="text-lg font-medium text-gray-900">
-                          {analyticsData.approvedReports}/{analyticsData.totalReports} Approved
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
 
             {/* Chart Controls */}
             <div className="bg-white shadow rounded-lg p-6 mb-6">
@@ -743,7 +718,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                 </div>
               )}
 
-              <div className="h-96">
+              <div className="h-[600px]">
                 <ResponsiveContainer width="100%" height="100%">
                   {chartType === 'pie' ? (
                     <PieChart>
@@ -779,7 +754,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                       <Legend />
                       <Bar dataKey="gross_revenue" fill="#10b981" name="Gross Revenue" />
                       <Bar dataKey="net_revenue" fill="#3b82f6" name="Net Revenue" />
-                      <Bar dataKey="gross_sales" fill="#22c55e" name="Sales" />
+                      <Bar dataKey="gross_sales" fill="#8b5cf6" name="Sales" />
                       <Bar dataKey="tips" fill="#f59e0b" name="Tips" />
                       <Bar dataKey="withdrawals" fill="#ef4444" name="Withdrawals" />
                       {isVirtualized && <Brush dataKey="date" height={30} />}
@@ -816,10 +791,10 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                       <Line 
                         type="monotone" 
                         dataKey="gross_sales" 
-                        stroke="#22c55e" 
+                        stroke="#8b5cf6" 
                         strokeWidth={2}
                         name="Sales"
-                        dot={{ fill: '#22c55e', strokeWidth: 2, r: 3 }}
+                        dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 3 }}
                       />
                       <Line 
                         type="monotone" 
