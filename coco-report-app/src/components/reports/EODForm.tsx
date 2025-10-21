@@ -1189,7 +1189,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
                   {formatCurrency(formData.gross_revenue)}
                 </div>
                 <div className="text-xs text-green-600 mt-1">
-                  Total Card Payment + Total Income from Delivery + Representacja 2 + Cash + Cash Deposits
+                  Total Card Payment + Total Income from Delivery + Representacja 2 + Cash + Flavor + Cash Deposits
                 </div>
               </div>
 
