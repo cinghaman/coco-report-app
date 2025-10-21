@@ -547,6 +547,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
         {/* Key Metrics */}
         {analyticsData && (
           <>
+            {/* Key Metrics - All in One Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <div className="bg-white overflow-hidden shadow rounded-lg">
                 <div className="p-5">
@@ -572,7 +573,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                 <div className="p-5">
                   <div className="flex items-center">
                     <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
+                      <div className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
@@ -588,11 +589,6 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                 </div>
               </div>
 
-
-            </div>
-
-            {/* Revenue Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               <div className="bg-white overflow-hidden shadow rounded-lg">
                 <div className="p-5">
                   <div className="flex items-center">
@@ -632,8 +628,6 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                   </div>
                 </div>
               </div>
-
-
             </div>
 
 
