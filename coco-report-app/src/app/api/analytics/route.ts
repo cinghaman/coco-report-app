@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { cache, generateCacheKey } from '@/lib/cache'
 
+// Updated analytics API with enhanced error handling and revenue reporting
+
 export async function POST(request: NextRequest) {
   try {
     if (!supabaseAdmin) {
