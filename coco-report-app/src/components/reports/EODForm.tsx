@@ -18,6 +18,7 @@ interface FormData {
   card_1: number
   card_2: number
   cash: number
+  flavor: number
   cash_deposits: number
   drawer: number
   przelew: number
@@ -62,6 +63,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     card_1: (initialData?.card_1 as number) || 0,
     card_2: (initialData?.card_2 as number) || 0,
     cash: (initialData?.cash as number) || 0,
+    flavor: (initialData?.flavor as number) || 0,
     cash_deposits: (initialData?.cash_deposits as number) || 0,
     drawer: (initialData?.drawer as number) || 0,
     przelew: (initialData?.przelew as number) || 0,
@@ -98,7 +100,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
       
       // Initialize display values for all number fields
       const numberFields = [
-        'total_sale_gross', 'card_1', 'card_2', 'cash', 'cash_deposits', 'drawer',
+        'total_sale_gross', 'card_1', 'card_2', 'cash', 'flavor', 'cash_deposits', 'drawer',
         'przelew', 'glovo', 'uber', 'wolt', 'pyszne', 'bolt', 'total_sale_with_special_payment',
         'withdrawal', 'locker_withdrawal', 'deposit', 'staff_cost', 'service_10_percent', 'staff_spent',
         'gross_revenue', 'net_revenue'
@@ -468,12 +470,12 @@ export default function EODForm({ user, initialData }: EODFormProps) {
   // Auto-calculate total_sale_gross (excluding Representacja 1, including cash_deposits and drawer)
   useEffect(() => {
     const calculatedTotal = formData.card_1 + formData.card_2 + formData.cash + 
-                           formData.cash_deposits + formData.drawer +
+                           formData.flavor + formData.cash_deposits + formData.drawer +
                            formData.przelew + formData.glovo + formData.uber + 
                            formData.wolt + formData.pyszne + formData.bolt + 
                            formData.total_sale_with_special_payment
     setFormData(prev => ({ ...prev, total_sale_gross: calculatedTotal }))
-  }, [formData.card_1, formData.card_2, formData.cash, formData.cash_deposits, formData.drawer,
+  }, [formData.card_1, formData.card_2, formData.cash, formData.flavor, formData.cash_deposits, formData.drawer,
       formData.przelew, formData.glovo, formData.uber, formData.wolt, formData.pyszne, 
       formData.bolt, formData.total_sale_with_special_payment])
 
@@ -481,9 +483,9 @@ export default function EODForm({ user, initialData }: EODFormProps) {
   useEffect(() => {
     const totalCardPayment = formData.card_1 + formData.card_2
     const totalIncomeFromDelivery = (formData.przelew + formData.glovo + formData.uber + formData.wolt + formData.pyszne + formData.bolt) * 0.70
-    const grossRevenue = totalCardPayment + totalIncomeFromDelivery + formData.total_sale_with_special_payment + formData.cash + formData.cash_deposits
+    const grossRevenue = totalCardPayment + totalIncomeFromDelivery + formData.total_sale_with_special_payment + formData.cash + formData.flavor + formData.cash_deposits
     setFormData(prev => ({ ...prev, gross_revenue: grossRevenue }))
-  }, [formData.card_1, formData.card_2, formData.przelew, formData.glovo, formData.uber, formData.wolt, formData.pyszne, formData.bolt, formData.total_sale_with_special_payment, formData.cash, formData.cash_deposits])
+  }, [formData.card_1, formData.card_2, formData.przelew, formData.glovo, formData.uber, formData.wolt, formData.pyszne, formData.bolt, formData.total_sale_with_special_payment, formData.cash, formData.flavor, formData.cash_deposits])
 
   // Auto-calculate net revenue
   useEffect(() => {
@@ -796,6 +798,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               {renderNumberInput('card_1', 'Card 1')}
               {renderNumberInput('card_2', 'Card 2')}
               {renderNumberInput('cash', 'Cash')}
+              {renderNumberInput('flavor', 'Flavor')}
               {renderNumberInput('cash_deposits', 'Cash Deposits')}
               {renderReadOnlyField('drawer', 'Locker + Drawer Previous')}
               {renderNumberInput('przelew', 'Przelew')}
@@ -1150,12 +1153,12 @@ export default function EODForm({ user, initialData }: EODFormProps) {
                 <div className="text-sm font-medium text-green-700 mb-1">Total Cash</div>
                 <div className="text-xl font-bold text-green-900">
                   {formatCurrency(
-                    formData.cash + formData.cash_deposits + formData.total_sale_with_special_payment + formData.drawer - 
+                    formData.cash + formData.flavor + formData.cash_deposits + formData.total_sale_with_special_payment + formData.drawer - 
                     getTotalWithdrawals() - ((getTotalServiceKwotowy() + formData.service_10_percent) * 0.75)
                   )}
                 </div>
                 <div className="text-xs text-green-600 mt-1">
-                  Cash + Cash Deposits + Representacja 2 + Drawer - Withdrawals - Total Service
+                  Cash + Flavor + Cash Deposits + Representacja 2 + Drawer - Withdrawals - Total Service
                 </div>
               </div>
 

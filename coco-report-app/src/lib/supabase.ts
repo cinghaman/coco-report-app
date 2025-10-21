@@ -49,6 +49,7 @@ export interface DailyReport {
   card_1: number
   card_2: number
   cash: number
+  flavor: number
   przelew: number
   glovo: number
   uber: number

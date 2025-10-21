@@ -312,6 +312,12 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
               </dd>
             </div>
             <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+              <dt className="text-sm font-medium text-gray-500">Flavor</dt>
+              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                {formatCurrency(report.flavor || 0)}
+              </dd>
+            </div>
+            <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
               <dt className="text-sm font-medium text-gray-500">Cash Deposits</dt>
               <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                 {formatCurrency(report.cash_deposits)}
@@ -510,13 +516,13 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
               <div className="text-sm font-medium text-green-700 mb-1">Total Cash</div>
               <div className="text-xl font-bold text-green-900">
                 {formatCurrency(
-                  report.cash + report.cash_deposits + report.total_sale_with_special_payment + report.drawer - 
+                  report.cash + (report.flavor || 0) + report.cash_deposits + report.total_sale_with_special_payment + report.drawer - 
                   withdrawals.reduce((sum, w) => sum + w.amount, 0) - 
                   ((serviceKwotowy.reduce((sum, s) => sum + s.amount, 0) + report.service_10_percent) * 0.75)
                 )}
               </div>
               <div className="text-xs text-green-600 mt-1">
-                Cash + Cash Deposits + Representacja 2 + Drawer - Withdrawals - Total Service
+                Cash + Flavor + Cash Deposits + Representacja 2 + Drawer - Withdrawals - Total Service
               </div>
             </div>
 
