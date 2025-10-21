@@ -59,6 +59,8 @@ export async function POST(request: NextRequest) {
     const totalReports = Number(analytics.total_reports) || 0
     const approvedReportsCount = Number(analytics.approved_reports) || 0
     const pendingReports = Number(analytics.pending_reports) || 0
+    const totalGrossRevenue = Number(analytics.total_gross_revenue) || 0
+    const totalNetRevenue = Number(analytics.total_net_revenue) || 0
 
     // Get daily data using optimized function
     const { data: dailyAnalyticsData, error: dailyAnalyticsError } = await supabaseAdmin
@@ -77,6 +79,8 @@ export async function POST(request: NextRequest) {
     const daysWithData = dailyAnalyticsData?.filter((day: { gross_sales: number }) => Number(day.gross_sales) > 0).length || 1
     const averageDailySales = totalGrossSales / daysWithData
     const averageDailyWithdrawals = totalWithdrawals / daysWithData
+    const averageDailyGrossRevenue = totalGrossRevenue / daysWithData
+    const averageDailyNetRevenue = totalNetRevenue / daysWithData
 
     // Prepare daily data for charts
     const dailyDataMap = new Map<string, {
@@ -86,6 +90,8 @@ export async function POST(request: NextRequest) {
       tips: number
       voids: number
       loss: number
+      gross_revenue: number
+      net_revenue: number
     }>()
 
     // Initialize daily data map with all dates in range
@@ -99,13 +105,15 @@ export async function POST(request: NextRequest) {
         withdrawals: 0,
         tips: 0,
         voids: 0,
-        loss: 0
+        loss: 0,
+        gross_revenue: 0,
+        net_revenue: 0
       })
       currentDate.setDate(currentDate.getDate() + 1)
     }
 
     // Populate daily data from database function results
-    dailyAnalyticsData?.forEach((day: { date: string; gross_sales: number; tips: number; voids: number; loss: number; withdrawals: number }) => {
+    dailyAnalyticsData?.forEach((day: { date: string; gross_sales: number; tips: number; voids: number; loss: number; withdrawals: number; gross_revenue: number; net_revenue: number }) => {
       const dateStr = day.date
       const dayData = dailyDataMap.get(dateStr)
       if (dayData) {
@@ -114,6 +122,8 @@ export async function POST(request: NextRequest) {
         dayData.voids = Number(day.voids) || 0
         dayData.loss = Number(day.loss) || 0
         dayData.withdrawals = Number(day.withdrawals) || 0
+        dayData.gross_revenue = Number(day.gross_revenue) || 0
+        dayData.net_revenue = Number(day.net_revenue) || 0
       }
     })
 
@@ -129,6 +139,10 @@ export async function POST(request: NextRequest) {
       totalLoss,
       averageDailySales,
       averageDailyWithdrawals,
+      totalGrossRevenue,
+      totalNetRevenue,
+      averageDailyGrossRevenue,
+      averageDailyNetRevenue,
       totalReports,
       approvedReports: approvedReportsCount,
       pendingReports,

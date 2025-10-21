@@ -30,6 +30,10 @@ interface AnalyticsData {
   totalLoss: number
   averageDailySales: number
   averageDailyWithdrawals: number
+  totalGrossRevenue: number
+  totalNetRevenue: number
+  averageDailyGrossRevenue: number
+  averageDailyNetRevenue: number
   totalReports: number
   approvedReports: number
   pendingReports: number
@@ -40,6 +44,8 @@ interface AnalyticsData {
     tips: number
     voids: number
     loss: number
+    gross_revenue: number
+    net_revenue: number
   }>
 }
 
@@ -48,7 +54,7 @@ interface AnalyticsContentProps {
 }
 
 export default function AnalyticsContent({ user }: AnalyticsContentProps) {
-  const [dateRange, setDateRange] = useState<'week' | 'month' | 'biweek' | 'quarter' | 'custom'>('month')
+  const [dateRange, setDateRange] = useState<'week' | 'month' | 'biweek' | 'quarter' | 'year' | 'last-year' | 'custom'>('month')
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
   const [loading, setLoading] = useState(true)
@@ -82,6 +88,13 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
       case 'quarter':
         const quarter = Math.floor(now.getMonth() / 3)
         startDate = new Date(now.getFullYear(), quarter * 3, 1)
+        break
+      case 'year':
+        startDate = new Date(now.getFullYear(), 0, 1)
+        break
+      case 'last-year':
+        startDate = new Date(now.getFullYear() - 1, 0, 1)
+        endDate = new Date(now.getFullYear() - 1, 11, 31)
         break
       case 'custom':
         if (!customStartDate || !customEndDate) {
@@ -358,7 +371,8 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
   const getPieChartData = () => {
     if (!analyticsData) return []
     return [
-      { name: 'Sales', value: analyticsData.totalGrossSales, color: '#10b981' },
+      { name: 'Gross Revenue', value: analyticsData.totalGrossRevenue, color: '#10b981' },
+      { name: 'Net Revenue', value: analyticsData.totalNetRevenue, color: '#3b82f6' },
       { name: 'Tips', value: analyticsData.totalTips, color: '#f59e0b' },
       { name: 'Withdrawals', value: analyticsData.totalWithdrawals, color: '#ef4444' },
       { name: 'Loss', value: analyticsData.totalLoss, color: '#8b5cf6' },
@@ -475,6 +489,8 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                 { value: 'biweek', label: 'Last 14 Days' },
                 { value: 'month', label: 'This Month' },
                 { value: 'quarter', label: 'This Quarter' },
+                { value: 'year', label: 'This Year' },
+                { value: 'last-year', label: 'Last Year' },
                 { value: 'custom', label: 'Custom Range' },
               ].map((option) => (
                 <button
@@ -615,6 +631,89 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                       <dl>
                         <dt className="text-sm font-medium text-gray-500 truncate">Total Loss</dt>
                         <dd className="text-lg font-medium text-gray-900">{formatCurrency(analyticsData.totalLoss)}</dd>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Revenue Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <div className="bg-white overflow-hidden shadow rounded-lg">
+                <div className="p-5">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt className="text-sm font-medium text-gray-500 truncate">Total Gross Revenue</dt>
+                        <dd className="text-lg font-medium text-gray-900">{formatCurrency(analyticsData.totalGrossRevenue)}</dd>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white overflow-hidden shadow rounded-lg">
+                <div className="p-5">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt className="text-sm font-medium text-gray-500 truncate">Total Net Revenue</dt>
+                        <dd className="text-lg font-medium text-gray-900">{formatCurrency(analyticsData.totalNetRevenue)}</dd>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white overflow-hidden shadow rounded-lg">
+                <div className="p-5">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-emerald-500 rounded-md flex items-center justify-center">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt className="text-sm font-medium text-gray-500 truncate">Avg Daily Gross Revenue</dt>
+                        <dd className="text-lg font-medium text-gray-900">{formatCurrency(analyticsData.averageDailyGrossRevenue)}</dd>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white overflow-hidden shadow rounded-lg">
+                <div className="p-5">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-cyan-500 rounded-md flex items-center justify-center">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt className="text-sm font-medium text-gray-500 truncate">Avg Daily Net Revenue</dt>
+                        <dd className="text-lg font-medium text-gray-900">{formatCurrency(analyticsData.averageDailyNetRevenue)}</dd>
                       </dl>
                     </div>
                   </div>
@@ -802,7 +901,9 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                       <YAxis tickFormatter={(value) => `${value} zł`} />
                       <Tooltip content={<CustomTooltip />} />
                       <Legend />
-                      <Bar dataKey="gross_sales" fill="#10b981" name="Sales" />
+                      <Bar dataKey="gross_revenue" fill="#10b981" name="Gross Revenue" />
+                      <Bar dataKey="net_revenue" fill="#3b82f6" name="Net Revenue" />
+                      <Bar dataKey="gross_sales" fill="#22c55e" name="Sales" />
                       <Bar dataKey="tips" fill="#f59e0b" name="Tips" />
                       <Bar dataKey="withdrawals" fill="#ef4444" name="Withdrawals" />
                       {isVirtualized && <Brush dataKey="date" height={30} />}
@@ -822,11 +923,27 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                       <Legend />
                       <Line 
                         type="monotone" 
-                        dataKey="gross_sales" 
+                        dataKey="gross_revenue" 
                         stroke="#10b981" 
                         strokeWidth={3}
-                        name="Sales"
+                        name="Gross Revenue"
                         dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="net_revenue" 
+                        stroke="#3b82f6" 
+                        strokeWidth={3}
+                        name="Net Revenue"
+                        dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="gross_sales" 
+                        stroke="#22c55e" 
+                        strokeWidth={2}
+                        name="Sales"
+                        dot={{ fill: '#22c55e', strokeWidth: 2, r: 3 }}
                       />
                       <Line 
                         type="monotone" 
