@@ -722,16 +722,14 @@ export default function EODForm({ user, initialData }: EODFormProps) {
       return (
         <div>
           <label htmlFor={field} className="block text-sm font-medium text-gray-700">
-            {label} <span className="text-xs text-gray-500">(Admin Editable)</span>
+            {label}
           </label>
           <input
-            type="number"
+            type="text"
             id={field}
             value={displayValue}
-            onChange={(e) => handleInputChange(field, e.target.value)}
-            step="0.01"
-            min="0"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
+            onChange={(e) => handleNumberInputChange(field, e.target.value)}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-gray-900 placeholder-gray-500"
             placeholder="0.00"
           />
         </div>
