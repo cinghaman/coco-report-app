@@ -1020,19 +1020,6 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               <div className="mb-6">
                 {renderNumberInput('service_10_percent', 'Service (10%)')}
               </div>
-
-              {/* Total Service */}
-              <div className="mb-6">
-                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                  <div className="text-sm font-medium text-purple-700 mb-1">Total Service</div>
-                  <div className="text-xl font-bold text-purple-900">
-                    {formatCurrency((getTotalServiceKwotowy() + formData.service_10_percent) * 0.75)}
-                  </div>
-                  <div className="text-xs text-purple-600 mt-1">
-                    (Service Kwotowy + Service 10%) × 0.75
-                  </div>
-                </div>
-              </div>
             </div>
 
           {/* Management Info Section (NEW) */}
@@ -1194,6 +1181,17 @@ export default function EODForm({ user, initialData }: EODFormProps) {
             <h3 className="text-lg font-medium text-gray-900 mb-4">Mini Calculations</h3>
             
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {/* Total Service */}
+              <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                <div className="text-sm font-medium text-purple-700 mb-1">Total Service</div>
+                <div className="text-xl font-bold text-purple-900">
+                  {formatCurrency((getTotalServiceKwotowy() + formData.service_10_percent) * 0.75)}
+                </div>
+                <div className="text-xs text-purple-600 mt-1">
+                  (Service Kwotowy + Service 10%) × 0.75
+                </div>
+              </div>
+
               {/* Total Card Payment */}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="text-sm font-medium text-blue-700 mb-1">Total Card Payment</div>
