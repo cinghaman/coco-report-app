@@ -35,6 +35,9 @@ interface FormData {
   service_10_percent: number
   // Management Info
   staff_spent: number
+  // Revenue fields
+  gross_revenue: number
+  net_revenue: number
 }
 
 export default function EODForm({ user, initialData }: EODFormProps) {
@@ -44,6 +47,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [cashPreviousDay, setCashPreviousDay] = useState<number>(0)
+  const [drawerPreviousDay, setDrawerPreviousDay] = useState<number>(0)
   const [reportId] = useState<string | null>(initialData?.id as string || null)
   const [displayValues, setDisplayValues] = useState<Record<string, string>>({})
   const [withdrawals, setWithdrawals] = useState<Array<{id: string, amount: number, reason: string}>>([{id: '1', amount: 0, reason: ''}])
@@ -72,7 +76,9 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     deposit: (initialData?.deposit as number) || 0,
     staff_cost: (initialData?.staff_cost as number) || 0,
     service_10_percent: (initialData?.service_10_percent as number) || 0,
-    staff_spent: (initialData?.staff_spent as number) || 0
+    staff_spent: (initialData?.staff_spent as number) || 0,
+    gross_revenue: (initialData?.gross_revenue as number) || 0,
+    net_revenue: (initialData?.net_revenue as number) || 0
   })
 
   useEffect(() => {
@@ -94,7 +100,8 @@ export default function EODForm({ user, initialData }: EODFormProps) {
       const numberFields = [
         'total_sale_gross', 'card_1', 'card_2', 'cash', 'cash_deposits', 'drawer',
         'przelew', 'glovo', 'uber', 'wolt', 'pyszne', 'bolt', 'total_sale_with_special_payment',
-        'withdrawal', 'locker_withdrawal', 'deposit', 'staff_cost', 'service_10_percent', 'staff_spent'
+        'withdrawal', 'locker_withdrawal', 'deposit', 'staff_cost', 'service_10_percent', 'staff_spent',
+        'gross_revenue', 'net_revenue'
       ]
       
       numberFields.forEach(field => {
@@ -156,6 +163,29 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     } catch (error) {
       console.error('Error fetching previous day cash:', error)
       setCashPreviousDay(0)
+    }
+  }
+
+  const fetchPreviousDayDrawer = async () => {
+    try {
+      if (!supabase) {
+        throw new Error('Supabase client not configured')
+      }
+      
+      const { data, error } = await supabase.rpc('fn_prev_day_total_cash', {
+        p_venue: formData.venue_id,
+        p_date: formData.for_date
+      })
+
+      if (error) throw error
+      const drawerValue = data || 0
+      setDrawerPreviousDay(drawerValue)
+      // Auto-populate the drawer field
+      setFormData(prev => ({ ...prev, drawer: drawerValue }))
+      setDisplayValues(prev => ({ ...prev, drawer: drawerValue.toString() }))
+    } catch (error) {
+      console.error('Error fetching previous day drawer:', error)
+      setDrawerPreviousDay(0)
     }
   }
 
@@ -426,6 +456,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
   useEffect(() => {
     if (formData.venue_id && formData.for_date) {
       fetchPreviousDayCash()
+      fetchPreviousDayDrawer()
     }
   }, [formData.venue_id, formData.for_date])
 
@@ -446,6 +477,21 @@ export default function EODForm({ user, initialData }: EODFormProps) {
       formData.przelew, formData.glovo, formData.uber, formData.wolt, formData.pyszne, 
       formData.bolt, formData.total_sale_with_special_payment])
 
+  // Auto-calculate gross revenue
+  useEffect(() => {
+    const totalCardPayment = formData.card_1 + formData.card_2
+    const totalIncomeFromDelivery = (formData.przelew + formData.glovo + formData.uber + formData.wolt + formData.pyszne + formData.bolt) * 0.70
+    const grossRevenue = totalCardPayment + totalIncomeFromDelivery + formData.total_sale_with_special_payment + formData.cash + formData.cash_deposits
+    setFormData(prev => ({ ...prev, gross_revenue: grossRevenue }))
+  }, [formData.card_1, formData.card_2, formData.przelew, formData.glovo, formData.uber, formData.wolt, formData.pyszne, formData.bolt, formData.total_sale_with_special_payment, formData.cash, formData.cash_deposits])
+
+  // Auto-calculate net revenue
+  useEffect(() => {
+    const totalService = (getTotalServiceKwotowy() + formData.service_10_percent) * 0.75
+    const netRevenue = formData.gross_revenue - getTotalWithdrawals() - totalService
+    setFormData(prev => ({ ...prev, net_revenue: netRevenue }))
+  }, [formData.gross_revenue, formData.service_10_percent, withdrawals, serviceKwotowy])
+
   const handleSave = async (status: 'draft' | 'submitted') => {
     if (!validateForm()) return
 
@@ -459,6 +505,8 @@ export default function EODForm({ user, initialData }: EODFormProps) {
         ...formData,
         status: status === 'submitted' ? 'approved' : status, // Auto-approve submitted reports
         cash_previous_day: cashPreviousDay,
+        gross_revenue: formData.gross_revenue,
+        net_revenue: formData.net_revenue,
       }
 
       let data, error
@@ -640,6 +688,26 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     )
   }
 
+  const renderReadOnlyField = (field: keyof FormData, label: string) => {
+    const displayValue = displayValues[field] || ''
+    
+    return (
+      <div>
+        <label htmlFor={field} className="block text-sm font-medium text-gray-700">
+          {label}
+        </label>
+        <input
+          type="text"
+          id={field}
+          value={displayValue}
+          readOnly
+          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-900 cursor-not-allowed"
+          placeholder="0.00"
+        />
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -729,7 +797,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               {renderNumberInput('card_2', 'Card 2')}
               {renderNumberInput('cash', 'Cash')}
               {renderNumberInput('cash_deposits', 'Cash Deposits')}
-              {renderNumberInput('drawer', 'Drawer')}
+              {renderReadOnlyField('drawer', 'Locker + Drawer Previous')}
               {renderNumberInput('przelew', 'Przelew')}
               {renderNumberInput('glovo', 'Glovo')}
               {renderNumberInput('uber', 'Uber')}
@@ -1101,6 +1169,35 @@ export default function EODForm({ user, initialData }: EODFormProps) {
                 </div>
                 <div className="text-xs text-orange-600 mt-1">
                   (Przelew + Glovo + Uber + Wolt + Pyszne + Bolt) × 0.70
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* End of Day Sales Section */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">End of Day Sales</h3>
+            
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {/* Gross Revenue */}
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="text-sm font-medium text-green-700 mb-1">Gross Revenue</div>
+                <div className="text-xl font-bold text-green-900">
+                  {formatCurrency(formData.gross_revenue)}
+                </div>
+                <div className="text-xs text-green-600 mt-1">
+                  Total Card Payment + Total Income from Delivery + Representacja 2 + Cash + Cash Deposits
+                </div>
+              </div>
+
+              {/* Net Revenue */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="text-sm font-medium text-blue-700 mb-1">Net Revenue</div>
+                <div className="text-xl font-bold text-blue-900">
+                  {formatCurrency(formData.net_revenue)}
+                </div>
+                <div className="text-xs text-blue-600 mt-1">
+                  Gross Revenue - Total Withdrawals - Total Service
                 </div>
               </div>
             </div>

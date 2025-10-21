@@ -64,6 +64,9 @@ export interface DailyReport {
   staff_cost: number
   service_10_percent: number
   staff_spent: number
+  // Revenue fields
+  gross_revenue: number
+  net_revenue: number
   // Carryover & derived snapshots
   cash_previous_day: number
   calculated_cash_expected: number

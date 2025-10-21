@@ -536,6 +536,40 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
         </div>
       </div>
 
+      {/* End of Day Sales Section */}
+      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+        <div className="px-4 py-5 sm:px-6">
+          <h3 className="text-lg leading-6 font-medium text-gray-900">End of Day Sales</h3>
+          <p className="mt-1 max-w-2xl text-sm text-gray-500">
+            Revenue calculations and summaries
+          </p>
+        </div>
+        <div className="border-t border-gray-200 p-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* Gross Revenue */}
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="text-sm font-medium text-green-700 mb-1">Gross Revenue</div>
+              <div className="text-xl font-bold text-green-900">
+                {formatCurrency(report.gross_revenue || 0)}
+              </div>
+              <div className="text-xs text-green-600 mt-1">
+                Total Card Payment + Total Income from Delivery + Representacja 2 + Cash + Cash Deposits
+              </div>
+            </div>
+
+            {/* Net Revenue */}
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="text-sm font-medium text-blue-700 mb-1">Net Revenue</div>
+              <div className="text-xl font-bold text-blue-900">
+                {formatCurrency(report.net_revenue || 0)}
+              </div>
+              <div className="text-xs text-blue-600 mt-1">
+                Gross Revenue - Total Withdrawals - Total Service
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Report Metadata */}
       <div className="bg-white shadow overflow-hidden sm:rounded-lg">
