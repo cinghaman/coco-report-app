@@ -63,6 +63,7 @@ export interface DailyReport {
   locker_withdrawal: number
   deposit: number
   staff_cost: number
+  services_before_10_percent: number
   service_10_percent: number
   staff_spent: number
   // Revenue fields

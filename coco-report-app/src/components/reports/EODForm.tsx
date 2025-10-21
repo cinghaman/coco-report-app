@@ -33,6 +33,7 @@ interface FormData {
   locker_withdrawal: number
   deposit: number
   staff_cost: number
+  services_before_10_percent: number
   service_10_percent: number
   // Management Info
   staff_spent: number
@@ -77,6 +78,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     locker_withdrawal: (initialData?.locker_withdrawal as number) || 0,
     deposit: (initialData?.deposit as number) || 0,
     staff_cost: (initialData?.staff_cost as number) || 0,
+    services_before_10_percent: (initialData?.services_before_10_percent as number) || 0,
     service_10_percent: (initialData?.service_10_percent as number) || 0,
     staff_spent: (initialData?.staff_spent as number) || 0,
     gross_revenue: (initialData?.gross_revenue as number) || 0,
@@ -102,7 +104,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
       const numberFields = [
         'total_sale_gross', 'card_1', 'card_2', 'cash', 'flavor', 'cash_deposits', 'drawer',
         'przelew', 'glovo', 'uber', 'wolt', 'pyszne', 'bolt', 'total_sale_with_special_payment',
-        'withdrawal', 'locker_withdrawal', 'deposit', 'staff_cost', 'service_10_percent', 'staff_spent',
+        'withdrawal', 'locker_withdrawal', 'deposit', 'staff_cost', 'services_before_10_percent', 'service_10_percent', 'staff_spent',
         'gross_revenue', 'net_revenue'
       ]
       
@@ -1016,6 +1018,21 @@ export default function EODForm({ user, initialData }: EODFormProps) {
                 </div>
               </div>
 
+              {/* Services (before 10%) - Single Field */}
+              <div className="mb-6">
+                {renderNumberInput('services_before_10_percent', 'Services (before 10%)')}
+              </div>
+
+              {/* Total Service (Kwotowy + Services before 10%) */}
+              <div className="mb-6">
+                <div className="p-3 bg-purple-50 border border-purple-200 rounded-md">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-purple-800">Total Service (Kwotowy + Services before 10%):</span>
+                    <span className="text-lg font-bold text-purple-900">{formatCurrency(getTotalServiceKwotowy() + formData.services_before_10_percent)}</span>
+                  </div>
+                </div>
+              </div>
+
               {/* Service (10%) - Single Field */}
               <div className="mb-6">
                 {renderNumberInput('service_10_percent', 'Service (10%)')}
@@ -1185,10 +1202,10 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
                 <div className="text-sm font-medium text-purple-700 mb-1">Total Service</div>
                 <div className="text-xl font-bold text-purple-900">
-                  {formatCurrency((getTotalServiceKwotowy() + formData.service_10_percent) * 0.75)}
+                  {formatCurrency((getTotalServiceKwotowy() + formData.services_before_10_percent) * 0.75)}
                 </div>
                 <div className="text-xs text-purple-600 mt-1">
-                  (Service Kwotowy + Service 10%) × 0.75
+                  (Service Kwotowy + Services before 10%) × 0.75
                 </div>
               </div>
 
@@ -1209,7 +1226,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
                 <div className="text-xl font-bold text-green-900">
                   {formatCurrency(
                     formData.cash + formData.flavor + formData.cash_deposits + formData.total_sale_with_special_payment + formData.drawer - 
-                    getTotalWithdrawals() - ((getTotalServiceKwotowy() + formData.service_10_percent) * 0.75)
+                    getTotalWithdrawals() - ((getTotalServiceKwotowy() + formData.services_before_10_percent) * 0.75)
                   )}
                 </div>
                 <div className="text-xs text-green-600 mt-1">
