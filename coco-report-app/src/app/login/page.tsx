@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createClientComponentClient } from '@/lib/supabase'
 
 export default function LoginPage() {
   const router = useRouter()
+  const supabase = createClientComponentClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,10 +16,6 @@ export default function LoginPage() {
   // Check if user is already authenticated
   useEffect(() => {
     const checkAuth = async () => {
-      if (!supabase) {
-        console.error('Supabase client not available')
-        return
-      }
 
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
@@ -39,11 +36,7 @@ export default function LoginPage() {
     setError('')
     setMessage('')
 
-    if (!supabase) {
-      setError('Supabase client not available')
-      setLoading(false)
-      return
-    }
+    setMessage('')
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
