@@ -21,7 +21,25 @@ export default function RootLayout({
         <div className="min-h-screen bg-gray-50">
           {children}
         </div>
-        <Script src="https://smtpmailer.vercel.app/cdn.js" strategy="beforeInteractive" />
+        <Script 
+          src="https://smtpmailer.vercel.app/cdn.js" 
+          strategy="beforeInteractive"
+          onLoad={() => {
+            console.log('SMTP Mailer script loaded')
+            if (typeof window !== 'undefined') {
+              // Try different possible global names
+              window.smtp = (window as any).smtp || (window as any).smtpmailer || (window as any).SMTPMailer
+              if (window.smtp) {
+                console.log('SMTP Mailer initialized successfully')
+              } else {
+                console.warn('SMTP Mailer script loaded but window.smtp not found')
+              }
+            }
+          }}
+          onError={(e) => {
+            console.error('Failed to load SMTP Mailer script:', e)
+          }}
+        />
       </body>
     </html>
   )

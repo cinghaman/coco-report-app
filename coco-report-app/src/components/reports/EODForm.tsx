@@ -580,8 +580,9 @@ export default function EODForm({ user, initialData }: EODFormProps) {
 
       if (error) throw error
 
-      // Send email notification if report is submitted or created
-      if (data.id) {
+      // Send email notification if report is created or submitted (not for drafts)
+      // Only send for submitted reports to avoid spam
+      if (data.id && status === 'submitted') {
         try {
           const venue = venues.find(v => v.id === formData.venue_id)
           const venueName = venue?.name || 'Unknown Venue'
@@ -603,6 +604,8 @@ export default function EODForm({ user, initialData }: EODFormProps) {
             ? adminEmails 
             : [process.env.NEXT_PUBLIC_SMTP_TO_EMAIL || 'shetty.aneet@gmail.com']
 
+          console.log('Preparing to send email notifications to:', recipientEmails)
+
           const action = initialData ? 'Updated' : 'Created'
           const subject = `EOD Report ${action} - ${venueName} - ${formData.for_date}`
           const body = `
@@ -620,30 +623,69 @@ export default function EODForm({ user, initialData }: EODFormProps) {
             <p>Please review the report in the admin dashboard.</p>
           `
 
+          // Wait for SMTP script to load if not available
+          let smtpAvailable = window.smtp
+          if (!smtpAvailable) {
+            console.log('SMTP script not loaded, waiting...')
+            // Wait up to 5 seconds for script to load
+            for (let i = 0; i < 50; i++) {
+              await new Promise(resolve => setTimeout(resolve, 100))
+              if (window.smtp) {
+                smtpAvailable = window.smtp
+                console.log('SMTP script loaded')
+                break
+              }
+            }
+          }
+
+          // Check environment variables
+          const smtpHost = process.env.NEXT_PUBLIC_SMTP_HOST
+          const smtpUsername = process.env.NEXT_PUBLIC_SMTP_USERNAME
+          const smtpPassword = process.env.NEXT_PUBLIC_SMTP_PASSWORD
+
+          console.log('SMTP Config:', {
+            host: smtpHost ? `${smtpHost.substring(0, 10)}...` : 'NOT SET',
+            username: smtpUsername ? `${smtpUsername.substring(0, 5)}...` : 'NOT SET',
+            password: smtpPassword ? 'SET' : 'NOT SET',
+            smtpAvailable: !!smtpAvailable
+          })
+
           // Send email to all admins
-          if (window.smtp) {
+          if (smtpAvailable && smtpHost && smtpUsername && smtpPassword) {
+            console.log('Sending emails to:', recipientEmails)
             // Send to each admin email
-            const emailPromises = recipientEmails.map(email => 
-              window.smtp.mail({
-                secure: true,
-                host: process.env.NEXT_PUBLIC_SMTP_HOST,
-                to: email,
-                from: `"Coco Reporting" <${process.env.NEXT_PUBLIC_SMTP_USERNAME}>`,
-                subject: subject,
-                body: body,
-                username: process.env.NEXT_PUBLIC_SMTP_USERNAME,
-                password: process.env.NEXT_PUBLIC_SMTP_PASSWORD,
-                encrypted: true
-              }).catch(err => {
+            const emailPromises = recipientEmails.map(async (email) => {
+              try {
+                console.log(`Attempting to send email to ${email}...`)
+                const result = await window.smtp.mail({
+                  secure: true,
+                  host: smtpHost,
+                  to: email,
+                  from: `"Coco Reporting" <${smtpUsername}>`,
+                  subject: subject,
+                  body: body,
+                  username: smtpUsername,
+                  password: smtpPassword,
+                  encrypted: true
+                })
+                console.log(`Email sent successfully to ${email}:`, result)
+                return result
+              } catch (err) {
                 console.error(`Failed to send email to ${email}:`, err)
                 return null
-              })
-            )
+              }
+            })
 
-            await Promise.all(emailPromises)
-            console.log(`Email notifications sent to ${recipientEmails.length} admin(s)`)
+            const results = await Promise.all(emailPromises)
+            const successCount = results.filter(r => r !== null).length
+            console.log(`Email notifications: ${successCount}/${recipientEmails.length} sent successfully`)
           } else {
-            console.warn('SMTP Mailer script not loaded')
+            const missing = []
+            if (!smtpAvailable) missing.push('SMTP script')
+            if (!smtpHost) missing.push('NEXT_PUBLIC_SMTP_HOST')
+            if (!smtpUsername) missing.push('NEXT_PUBLIC_SMTP_USERNAME')
+            if (!smtpPassword) missing.push('NEXT_PUBLIC_SMTP_PASSWORD')
+            console.error('Cannot send email - missing:', missing.join(', '))
           }
 
         } catch (emailError) {
