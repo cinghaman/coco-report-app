@@ -1,21 +1,46 @@
-import { createClient } from '@supabase/supabase-js'
 import { createBrowserClient } from '@supabase/ssr'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-// Client-side Supabase client (only create if env vars are available)
-export const supabase = supabaseUrl && supabaseAnonKey 
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null
+// Singleton browser client instance to avoid multiple GoTrueClient instances
+// Using a function to lazily initialize the client only when needed
+let browserClientInstance: ReturnType<typeof createBrowserClient> | null = null
 
-// Browser client for SSR
-export const createClientComponentClient = () => {
+function getBrowserClient() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+  
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Supabase environment variables are not configured')
   }
-  return createBrowserClient(supabaseUrl, supabaseAnonKey)
+  
+  // Return singleton instance if it exists
+  if (browserClientInstance) {
+    return browserClientInstance
+  }
+  
+  // Create new instance only if it doesn't exist
+  // createBrowserClient handles its own singleton internally based on storage key
+  // but we also maintain a module-level singleton to ensure consistency
+  browserClientInstance = createBrowserClient(supabaseUrl, supabaseAnonKey)
+  return browserClientInstance
 }
+
+// Browser client for SSR - returns singleton instance
+export const createClientComponentClient = () => {
+  const client = getBrowserClient()
+  if (!client) {
+    throw new Error('createClientComponentClient can only be called in browser environment')
+  }
+  return client
+}
+
+// Export singleton for backward compatibility
+// This ensures existing code continues to work while we migrate
+// Only available in browser environment
+export const supabase = getBrowserClient()
 
 // Database types based on our schema
 export type UserRole = 'staff' | 'admin' | 'owner'
