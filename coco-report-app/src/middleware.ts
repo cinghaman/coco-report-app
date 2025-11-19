@@ -35,9 +35,34 @@ export async function middleware(request: NextRequest) {
   // https://supabase.com/docs/guides/auth/server-side/nextjs
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Protect routes
+  // Allow access to auth callback and pending approval pages
+  if (
+    request.nextUrl.pathname.startsWith('/auth/callback') ||
+    request.nextUrl.pathname.startsWith('/pending-approval')
+  ) {
+    return response
+  }
+
+  // Protect routes - redirect to login if not authenticated
   if (request.nextUrl.pathname.startsWith('/dashboard') && !user) {
     return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Check if user is approved (for authenticated users accessing protected routes)
+  if (user && request.nextUrl.pathname.startsWith('/dashboard')) {
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('approved, email')
+      .eq('id', user.id)
+      .single()
+
+    // Super admins bypass approval check
+    const superAdminEmails = ['admin@thoughtbulb.dev', 'shetty.aneet@gmail.com']
+    const isSuperAdmin = userProfile?.email && superAdminEmails.includes(userProfile.email)
+
+    if (userProfile && !userProfile.approved && !isSuperAdmin) {
+      return NextResponse.redirect(new URL('/pending-approval', request.url))
+    }
   }
 
   if (request.nextUrl.pathname === '/' && user) {
