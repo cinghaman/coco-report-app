@@ -6,17 +6,25 @@ import { createClientComponentClient } from '@/lib/supabase'
 
 export default function LoginPage() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const [supabase, setSupabase] = useState<ReturnType<typeof createClientComponentClient> | null>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
+  // Initialize Supabase client only in browser
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setSupabase(createClientComponentClient())
+    }
+  }, [])
+
   // Check if user is already authenticated
   useEffect(() => {
+    if (!supabase) return
+    
     const checkAuth = async () => {
-
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
 
@@ -28,7 +36,7 @@ export default function LoginPage() {
       }
     }
     checkAuth()
-  }, [router])
+  }, [router, supabase])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,6 +45,12 @@ export default function LoginPage() {
     setMessage('')
 
     setMessage('')
+
+    if (!supabase) {
+      setError('Client not initialized')
+      setLoading(false)
+      return
+    }
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({

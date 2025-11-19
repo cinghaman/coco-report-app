@@ -17,7 +17,7 @@ interface User {
 
 export default function UsersAdminPage() {
     const router = useRouter()
-    const supabase = createClientComponentClient()
+    const [supabase, setSupabase] = useState<ReturnType<typeof createClientComponentClient> | null>(null)
     const [users, setUsers] = useState<User[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>('pending')
@@ -32,12 +32,23 @@ export default function UsersAdminPage() {
     })
     const [createLoading, setCreateLoading] = useState(false)
 
+    // Initialize Supabase client only in browser
     useEffect(() => {
-        checkAccess()
-        fetchUsers()
+        if (typeof window !== 'undefined') {
+            setSupabase(createClientComponentClient())
+        }
     }, [])
 
+    useEffect(() => {
+        if (supabase) {
+            checkAccess()
+            fetchUsers()
+        }
+    }, [supabase])
+
     const checkAccess = async () => {
+        if (!supabase) return
+        
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
             router.push('/login')

@@ -7,9 +7,18 @@ import { useRouter } from 'next/navigation'
 export default function PendingApprovalPage() {
     const router = useRouter()
     const [email, setEmail] = useState<string>('')
-    const supabase = createClientComponentClient()
+    const [supabase, setSupabase] = useState<ReturnType<typeof createClientComponentClient> | null>(null)
+
+    // Initialize Supabase client only in browser
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            setSupabase(createClientComponentClient())
+        }
+    }, [])
 
     useEffect(() => {
+        if (!supabase) return
+        
         const getUser = async () => {
             const { data: { user } } = await supabase.auth.getUser()
             if (user) {
@@ -19,10 +28,12 @@ export default function PendingApprovalPage() {
             }
         }
         getUser()
-    }, [router, supabase.auth])
+    }, [router, supabase])
 
     const handleSignOut = async () => {
-        await supabase.auth.signOut()
+        if (supabase) {
+            await supabase.auth.signOut()
+        }
         router.push('/login')
     }
 
