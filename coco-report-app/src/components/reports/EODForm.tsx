@@ -623,88 +623,32 @@ export default function EODForm({ user, initialData }: EODFormProps) {
             <p>Please review the report in the admin dashboard.</p>
           `
 
-          // Wait for SMTP script to load if not available
-          let smtpAvailable = window.smtp
-          if (!smtpAvailable) {
-            console.log('SMTP script not loaded, waiting...')
-            // Wait up to 5 seconds for script to load
-            for (let i = 0; i < 50; i++) {
-              await new Promise(resolve => setTimeout(resolve, 100))
-              if (window.smtp) {
-                smtpAvailable = window.smtp
-                console.log('SMTP script loaded')
-                break
-              }
-            }
-          }
-
-          // Check environment variables
-          const smtpHost = process.env.NEXT_PUBLIC_SMTP_HOST
-          const smtpUsername = process.env.NEXT_PUBLIC_SMTP_USERNAME
-          const smtpPassword = process.env.NEXT_PUBLIC_SMTP_PASSWORD
-          const smtpService = process.env.NEXT_PUBLIC_SMTP_SERVICE // Optional: e.g. 'gmail'
-          const smtpPort = process.env.NEXT_PUBLIC_SMTP_PORT ? parseInt(process.env.NEXT_PUBLIC_SMTP_PORT) : undefined
-
-          console.log('SMTP Config:', {
-            host: smtpHost ? `${smtpHost.substring(0, 10)}...` : 'NOT SET',
-            username: smtpUsername ? `${smtpUsername.substring(0, 5)}...` : 'NOT SET',
-            password: smtpPassword ? 'SET' : 'NOT SET',
-            service: smtpService || 'NOT SET',
-            port: smtpPort || 'NOT SET',
-            smtpAvailable: !!smtpAvailable
-          })
-
-          // Send email to all admins
-          if (smtpAvailable && smtpUsername && smtpPassword) {
-            console.log('Sending emails to:', recipientEmails)
-            // Send to each admin email
-            const emailPromises = recipientEmails.map(async (email) => {
-              try {
-                console.log(`Attempting to send email to ${email}...`)
-                
-                // Build email options - use service if provided, otherwise use host/port
-                const emailOptions: any = {
-                  to: email,
-                  from: `"Coco Reporting" <${smtpUsername}>`,
-                  subject: subject,
-                  body: body,
-                  username: smtpUsername,
-                  password: smtpPassword,
-                  encrypted: true // Use encrypted password
-                }
-
-                // Use service if provided (simpler), otherwise use host/port
-                if (smtpService) {
-                  emailOptions.service = smtpService
-                } else if (smtpHost) {
-                  emailOptions.host = smtpHost
-                  emailOptions.secure = true
-                  if (smtpPort) {
-                    emailOptions.port = smtpPort
-                  }
-                } else {
-                  throw new Error('Either NEXT_PUBLIC_SMTP_SERVICE or NEXT_PUBLIC_SMTP_HOST must be set')
-                }
-
-                const result = await window.smtp.mail(emailOptions)
-                console.log(`Email sent successfully to ${email}:`, result)
-                return result
-              } catch (err) {
-                console.error(`Failed to send email to ${email}:`, err)
-                return null
-              }
+          // Use server-side API to send emails (avoids CORS issues)
+          console.log('Sending email notifications to:', recipientEmails)
+          
+          try {
+            const emailResponse = await fetch('/api/send-email', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                to: recipientEmails,
+                subject: subject,
+                html: body
+              }),
             })
 
-            const results = await Promise.all(emailPromises)
-            const successCount = results.filter(r => r !== null).length
-            console.log(`Email notifications: ${successCount}/${recipientEmails.length} sent successfully`)
-          } else {
-            const missing = []
-            if (!smtpAvailable) missing.push('SMTP script')
-            if (!smtpUsername) missing.push('NEXT_PUBLIC_SMTP_USERNAME')
-            if (!smtpPassword) missing.push('NEXT_PUBLIC_SMTP_PASSWORD')
-            if (!smtpService && !smtpHost) missing.push('NEXT_PUBLIC_SMTP_SERVICE or NEXT_PUBLIC_SMTP_HOST')
-            console.error('Cannot send email - missing:', missing.join(', '))
+            if (emailResponse.ok) {
+              const emailResult = await emailResponse.json()
+              console.log('Email notifications:', emailResult.message)
+            } else {
+              const errorData = await emailResponse.json()
+              console.error('Failed to send email notifications:', errorData)
+            }
+          } catch (emailError) {
+            console.error('Error sending email notifications:', emailError)
+            // Don't fail the save operation if email fails
           }
 
         } catch (emailError) {

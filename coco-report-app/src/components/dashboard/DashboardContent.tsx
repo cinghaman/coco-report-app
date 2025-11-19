@@ -232,73 +232,28 @@ export default function DashboardContent({ user }: DashboardContentProps) {
       // Send email notification if provided
       if (result.emailNotification?.shouldSend) {
         try {
-          // Wait for SMTP to be available
-          let smtpAvailable = window.smtp
-          if (!smtpAvailable) {
-            console.log('SMTP not available, waiting...')
-            for (let i = 0; i < 50; i++) {
-              await new Promise(resolve => setTimeout(resolve, 100))
-              if (window.smtp) {
-                smtpAvailable = window.smtp
-                break
-              }
-            }
-          }
+          const { to, subject, html } = result.emailNotification
+          console.log('Sending deletion email notifications to:', Array.isArray(to) ? to : [to])
+          
+          // Use server-side API to send emails (avoids CORS issues)
+          const emailResponse = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              to: Array.isArray(to) ? to : [to],
+              subject: subject,
+              html: html
+            }),
+          })
 
-          if (smtpAvailable) {
-            const { to, subject, html } = result.emailNotification
-            const smtpHost = process.env.NEXT_PUBLIC_SMTP_HOST
-            const smtpUsername = process.env.NEXT_PUBLIC_SMTP_USERNAME
-            const smtpPassword = process.env.NEXT_PUBLIC_SMTP_PASSWORD
-            const smtpService = process.env.NEXT_PUBLIC_SMTP_SERVICE
-            const smtpPort = process.env.NEXT_PUBLIC_SMTP_PORT ? parseInt(process.env.NEXT_PUBLIC_SMTP_PORT) : undefined
-
-            if (smtpUsername && smtpPassword && (smtpService || smtpHost)) {
-              console.log('Sending deletion email notifications to:', Array.isArray(to) ? to : [to])
-              
-              // Send to each admin email
-              const emailPromises = (Array.isArray(to) ? to : [to]).map(async (email) => {
-                try {
-                  // Build email options - use service if provided, otherwise use host/port
-                  const emailOptions: any = {
-                    to: email,
-                    from: `"Coco Reporting" <${smtpUsername}>`,
-                    subject: subject,
-                    body: html,
-                    username: smtpUsername,
-                    password: smtpPassword,
-                    encrypted: true // Use encrypted password
-                  }
-
-                  // Use service if provided (simpler), otherwise use host/port
-                  if (smtpService) {
-                    emailOptions.service = smtpService
-                  } else if (smtpHost) {
-                    emailOptions.host = smtpHost
-                    emailOptions.secure = true
-                    if (smtpPort) {
-                      emailOptions.port = smtpPort
-                    }
-                  }
-
-                  const result = await window.smtp!.mail(emailOptions)
-                  console.log(`Deletion email sent successfully to ${email}`)
-                  return result
-                } catch (err) {
-                  console.error(`Failed to send email to ${email}:`, err)
-                  return null
-                }
-              })
-
-              const results = await Promise.all(emailPromises)
-              const successCount = results.filter(r => r !== null).length
-              console.log(`Deletion email notifications: ${successCount}/${(Array.isArray(to) ? to : [to]).length} sent successfully`)
-            } else {
-              console.error('SMTP configuration missing - cannot send deletion email')
-              console.log('Required: NEXT_PUBLIC_SMTP_USERNAME, NEXT_PUBLIC_SMTP_PASSWORD, and (NEXT_PUBLIC_SMTP_SERVICE or NEXT_PUBLIC_SMTP_HOST)')
-            }
+          if (emailResponse.ok) {
+            const emailResult = await emailResponse.json()
+            console.log('Deletion email notifications:', emailResult.message)
           } else {
-            console.warn('SMTP Mailer not available - cannot send deletion email notification')
+            const errorData = await emailResponse.json()
+            console.error('Failed to send deletion email notifications:', errorData)
           }
         } catch (emailError) {
           console.error('Failed to send email notification:', emailError)

@@ -12,24 +12,94 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { to, subject, html } = body
+    const { to, subject, html, emailOptions } = body
 
-    if (!to || !subject || !html) {
+    // Support both simple format (to, subject, html) and full emailOptions
+    if (!emailOptions && (!to || !subject || !html)) {
       return NextResponse.json({ error: 'Missing required fields: to, subject, html' }, { status: 400 })
     }
 
-    // For now, we'll return success and let the client handle the actual email sending
-    // since the SMTP mailer is client-side only
-    // In the future, this could be replaced with a server-side email service
-    
-    return NextResponse.json({ 
-      message: 'Email queued for sending',
-      // Return the email data so client can send it
-      emailData: {
-        to,
-        subject,
-        html
+    // Get SMTP configuration from environment variables
+    const smtpHost = process.env.NEXT_PUBLIC_SMTP_HOST
+    const smtpUsername = process.env.NEXT_PUBLIC_SMTP_USERNAME
+    const smtpPassword = process.env.NEXT_PUBLIC_SMTP_PASSWORD
+    const smtpService = process.env.NEXT_PUBLIC_SMTP_SERVICE
+    const smtpPort = process.env.NEXT_PUBLIC_SMTP_PORT ? parseInt(process.env.NEXT_PUBLIC_SMTP_PORT) : undefined
+
+    if (!smtpUsername || !smtpPassword || (!smtpService && !smtpHost)) {
+      return NextResponse.json({ 
+        error: 'SMTP configuration missing',
+        details: 'NEXT_PUBLIC_SMTP_USERNAME, NEXT_PUBLIC_SMTP_PASSWORD, and (NEXT_PUBLIC_SMTP_SERVICE or NEXT_PUBLIC_SMTP_HOST) must be set'
+      }, { status: 500 })
+    }
+
+    // Build email options
+    const mailOptions: any = emailOptions || {
+      to: Array.isArray(to) ? to : [to],
+      from: `"Coco Reporting" <${smtpUsername}>`,
+      subject: subject,
+      body: html,
+      username: smtpUsername,
+      password: smtpPassword,
+      encrypted: true
+    }
+
+    // Add service or host/port
+    if (smtpService) {
+      mailOptions.service = smtpService
+    } else if (smtpHost) {
+      mailOptions.host = smtpHost
+      mailOptions.secure = true
+      if (smtpPort) {
+        mailOptions.port = smtpPort
       }
+    }
+
+    // Send emails - handle both single and array of recipients
+    const recipients = Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to]
+    const results = []
+
+    for (const recipient of recipients) {
+      try {
+        const singleEmailOptions = {
+          ...mailOptions,
+          to: recipient
+        }
+
+        const response = await fetch('https://smtpmailer.vercel.app/api/smtpmailer', {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json, text/plain, */*',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(singleEmailOptions),
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error(`Failed to send email to ${recipient}:`, response.status, errorText)
+          results.push({ recipient, success: false, error: errorText })
+        } else {
+          const result = await response.json()
+          console.log(`Email sent successfully to ${recipient}`)
+          results.push({ recipient, success: true, result })
+        }
+      } catch (error) {
+        console.error(`Error sending email to ${recipient}:`, error)
+        results.push({ 
+          recipient, 
+          success: false, 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        })
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length
+    const totalCount = results.length
+
+    return NextResponse.json({ 
+      message: `Email sending completed: ${successCount}/${totalCount} sent successfully`,
+      results
     })
 
   } catch (error: unknown) {
