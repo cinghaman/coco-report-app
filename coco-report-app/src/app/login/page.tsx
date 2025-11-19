@@ -139,40 +139,6 @@ export default function LoginPage() {
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-gray-50 text-gray-500">Or continue with</span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={async () => {
-                setLoading(true)
-                try {
-                  const { error } = await supabase!.auth.signInWithOAuth({
-                    provider: 'auth0',
-                    options: {
-                      redirectTo: `${window.location.origin}/auth/callback`,
-                    },
-                  })
-                  if (error) throw error
-                } catch (error) {
-                  console.error('Auth0 login error:', error)
-                  setError(`Auth0 login failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-                  setLoading(false)
-                }
-              }}
-              disabled={loading}
-              className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
-            >
-              <img className="h-5 w-5 mr-2" src="https://cdn.auth0.com/styleguide/components/1.0.8/media/logos/img/badge.png" alt="Auth0 Logo" />
-              Sign in with Auth0
-            </button>
           </div>
         </form>
       </div>
