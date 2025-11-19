@@ -38,16 +38,32 @@ export async function DELETE(
       return NextResponse.json({ error: 'Report ID is required' }, { status: 400 })
     }
 
-    // 3. Verify the report exists
+    // 3. Verify the report exists and get details for email notification
     const { data: report, error: reportError } = await supabase
       .from('daily_reports')
-      .select('id, status')
+      .select(`
+        id, 
+        status, 
+        for_date,
+        venue_id,
+        gross_revenue,
+        net_revenue
+      `)
       .eq('id', reportId)
       .single()
 
     if (reportError || !report) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 })
     }
+
+    // Get venue name separately
+    const { data: venue } = await supabase
+      .from('venues')
+      .select('name')
+      .eq('id', report.venue_id)
+      .single()
+    
+    const venueName = venue?.name || 'Unknown Venue'
 
     // 4. Use Service Role Key to delete the report and all related data
     const supabaseAdmin = createClient(
@@ -113,10 +129,44 @@ export async function DELETE(
       }, { status: 500 })
     }
 
-    return NextResponse.json({ 
-      message: 'Report deleted successfully',
-      reportId 
-    })
+    // Send email notification to admins about the deletion
+    try {
+      // Get all admin emails
+      const { data: adminUsers } = await supabaseAdmin
+        .from('users')
+        .select('email, display_name')
+        .in('role', ['admin', 'owner'])
+
+      const adminEmails = adminUsers?.map(u => u.email).filter(Boolean) || []
+      const reportDate = new Date(report.for_date).toLocaleDateString('pl-PL')
+
+      // Return email data so client can send it (since SMTP mailer is client-side)
+      return NextResponse.json({ 
+        message: 'Report deleted successfully',
+        reportId,
+        emailNotification: {
+          shouldSend: true,
+          to: adminEmails,
+          subject: `Report Deleted - ${venueName} - ${reportDate}`,
+          html: `
+            <h2>Report Deleted</h2>
+            <p><strong>Venue:</strong> ${venueName}</p>
+            <p><strong>Date:</strong> ${reportDate}</p>
+            <p><strong>Deleted by:</strong> ${currentUser.email}</p>
+            <p><strong>Gross Revenue:</strong> ${(report.gross_revenue || 0).toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}</p>
+            <p><strong>Net Revenue:</strong> ${(report.net_revenue || 0).toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}</p>
+            <p>This report and all associated data have been permanently deleted.</p>
+          `
+        }
+      })
+    } catch (emailError) {
+      // Don't fail the deletion if email notification fails
+      console.error('Error preparing email notification:', emailError)
+      return NextResponse.json({ 
+        message: 'Report deleted successfully',
+        reportId 
+      })
+    }
 
   } catch (error: unknown) {
     console.error('Error in delete report endpoint:', error)

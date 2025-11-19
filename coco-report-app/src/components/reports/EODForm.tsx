@@ -580,18 +580,37 @@ export default function EODForm({ user, initialData }: EODFormProps) {
 
       if (error) throw error
 
-      // Send email notification if report is submitted
-      if (status === 'submitted' && data.id) {
+      // Send email notification if report is submitted or created
+      if (data.id) {
         try {
           const venue = venues.find(v => v.id === formData.venue_id)
           const venueName = venue?.name || 'Unknown Venue'
 
-          const subject = `New EOD Report Submitted - ${venueName} - ${formData.for_date}`
+          // Fetch all admin emails
+          const { data: adminUsers, error: adminError } = await supabase
+            .from('users')
+            .select('email, display_name')
+            .in('role', ['admin', 'owner'])
+
+          if (adminError) {
+            console.error('Error fetching admin emails:', adminError)
+          }
+
+          const adminEmails = adminUsers?.map(u => u.email).filter(Boolean) || []
+          
+          // Fallback to default email if no admins found
+          const recipientEmails = adminEmails.length > 0 
+            ? adminEmails 
+            : [process.env.NEXT_PUBLIC_SMTP_TO_EMAIL || 'shetty.aneet@gmail.com']
+
+          const action = initialData ? 'Updated' : 'Created'
+          const subject = `EOD Report ${action} - ${venueName} - ${formData.for_date}`
           const body = `
-            <h2>New EOD Report Submitted</h2>
+            <h2>EOD Report ${action}</h2>
             <p><strong>Venue:</strong> ${venueName}</p>
             <p><strong>Date:</strong> ${formData.for_date}</p>
-            <p><strong>Submitted by:</strong> ${user.display_name || user.email}</p>
+            <p><strong>${initialData ? 'Updated' : 'Created'} by:</strong> ${user.display_name || user.email}</p>
+            <p><strong>Status:</strong> ${status === 'submitted' ? 'Submitted' : 'Draft'}</p>
             <h3>Sales Summary</h3>
             <ul>
               <li><strong>Total Sales:</strong> ${formData.total_sale_gross.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}</li>
@@ -601,20 +620,28 @@ export default function EODForm({ user, initialData }: EODFormProps) {
             <p>Please review the report in the admin dashboard.</p>
           `
 
-          // Check if window.smtp is available
+          // Send email to all admins
           if (window.smtp) {
-            await window.smtp.mail({
-              secure: true,
-              host: process.env.NEXT_PUBLIC_SMTP_HOST,
-              to: process.env.NEXT_PUBLIC_SMTP_TO_EMAIL || 'shetty.aneet@gmail.com',
-              from: `"Coco Reporting" <${process.env.NEXT_PUBLIC_SMTP_USERNAME}>`,
-              subject: subject,
-              body: body,
-              username: process.env.NEXT_PUBLIC_SMTP_USERNAME,
-              password: process.env.NEXT_PUBLIC_SMTP_PASSWORD,
-              encrypted: true
-            })
-            console.log('Email sent successfully')
+            // Send to each admin email
+            const emailPromises = recipientEmails.map(email => 
+              window.smtp.mail({
+                secure: true,
+                host: process.env.NEXT_PUBLIC_SMTP_HOST,
+                to: email,
+                from: `"Coco Reporting" <${process.env.NEXT_PUBLIC_SMTP_USERNAME}>`,
+                subject: subject,
+                body: body,
+                username: process.env.NEXT_PUBLIC_SMTP_USERNAME,
+                password: process.env.NEXT_PUBLIC_SMTP_PASSWORD,
+                encrypted: true
+              }).catch(err => {
+                console.error(`Failed to send email to ${email}:`, err)
+                return null
+              })
+            )
+
+            await Promise.all(emailPromises)
+            console.log(`Email notifications sent to ${recipientEmails.length} admin(s)`)
           } else {
             console.warn('SMTP Mailer script not loaded')
           }

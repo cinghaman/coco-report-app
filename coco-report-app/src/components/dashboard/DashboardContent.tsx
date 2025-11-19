@@ -227,6 +227,39 @@ export default function DashboardContent({ user }: DashboardContentProps) {
         throw new Error(error.error || 'Failed to delete report')
       }
 
+      const result = await response.json()
+
+      // Send email notification if provided
+      if (result.emailNotification?.shouldSend && window.smtp) {
+        try {
+          const { to, subject, html } = result.emailNotification
+          
+          // Send to each admin email
+          const emailPromises = (Array.isArray(to) ? to : [to]).map(email => 
+            window.smtp.mail({
+              secure: true,
+              host: process.env.NEXT_PUBLIC_SMTP_HOST,
+              to: email,
+              from: `"Coco Reporting" <${process.env.NEXT_PUBLIC_SMTP_USERNAME}>`,
+              subject: subject,
+              body: html,
+              username: process.env.NEXT_PUBLIC_SMTP_USERNAME,
+              password: process.env.NEXT_PUBLIC_SMTP_PASSWORD,
+              encrypted: true
+            }).catch(err => {
+              console.error(`Failed to send email to ${email}:`, err)
+              return null
+            })
+          )
+
+          await Promise.all(emailPromises)
+          console.log(`Email notifications sent to ${(Array.isArray(to) ? to : [to]).length} admin(s)`)
+        } catch (emailError) {
+          console.error('Failed to send email notification:', emailError)
+          // Don't fail the deletion if email fails
+        }
+      }
+
       // Refresh the reports list
       await fetchDashboardData()
       
