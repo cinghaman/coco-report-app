@@ -25,6 +25,37 @@ declare global {
 
 export default function SMTPLoader() {
   useEffect(() => {
+    // Create a fallback implementation that calls the API directly
+    const createFallbackSMTP = () => {
+      if (!window.smtp) {
+        window.smtp = {
+          mail: async (params: any) => {
+            try {
+              const res = await fetch("https://smtpmailer.vercel.app/api/smtpmailer", {
+                method: "POST",
+                headers: {
+                  Accept: "application/json, text/plain, */*",
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(params),
+              });
+              
+              if (res.ok) {
+                return await res.json();
+              } else {
+                throw new Error("Error sending email.");
+              }
+            } catch (error) {
+              throw error;
+            }
+          }
+        };
+        console.log('SMTP Mailer fallback implementation created (using API directly)');
+        return true;
+      }
+      return false;
+    };
+
     // Check if script is already loaded
     const checkSMTP = () => {
       if (typeof window === 'undefined') return false
@@ -33,7 +64,7 @@ export default function SMTPLoader() {
       // Check directly for window.smtp
       if ((window as any).smtp && typeof (window as any).smtp === 'object' && typeof (window as any).smtp.mail === 'function') {
         window.smtp = (window as any).smtp
-        console.log('SMTP Mailer initialized successfully - window.smtp found')
+        console.log('SMTP Mailer initialized successfully - window.smtp found from script')
         return true
       }
 
@@ -44,6 +75,15 @@ export default function SMTPLoader() {
     if (checkSMTP()) {
       return
     }
+
+    // Also create fallback immediately in case script never loads
+    // This ensures window.smtp is always available
+    setTimeout(() => {
+      if (!checkSMTP() && !window.smtp) {
+        console.log('Creating SMTP fallback implementation (script may not expose window.smtp)')
+        createFallbackSMTP()
+      }
+    }, 2000) // Wait 2 seconds, then create fallback if script hasn't loaded
 
     // Wait for script to load - check more frequently at first
     let checkCount = 0
@@ -81,15 +121,13 @@ export default function SMTPLoader() {
         clearInterval(interval)
         const scriptTag = document.querySelector('script[src*="smtpmailer.vercel.app"], script[id="smtp-mailer-script"]')
         if (scriptTag) {
-          console.error('SMTP Mailer script tag exists but window.smtp not found after 15 seconds')
-          console.log('Script tag:', scriptTag.outerHTML.substring(0, 200))
-          console.log('Checking window.smtp:', {
-            exists: typeof (window as any).smtp !== 'undefined',
-            type: typeof (window as any).smtp,
-            hasMail: typeof (window as any).smtp?.mail === 'function'
-          })
+          console.warn('SMTP Mailer script tag exists but window.smtp not found after 15 seconds')
+          console.log('Creating fallback implementation using API directly...')
+          // Create fallback implementation
+          createFallbackSMTP()
         } else {
-          console.error('SMTP Mailer script tag not found in DOM - script may not have loaded')
+          console.warn('SMTP Mailer script tag not found in DOM - creating fallback implementation')
+          createFallbackSMTP()
         }
       }
     }, 100)
