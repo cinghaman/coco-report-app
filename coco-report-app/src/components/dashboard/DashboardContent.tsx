@@ -26,6 +26,14 @@ export default function DashboardContent({ user }: DashboardContentProps) {
   const [totalPages, setTotalPages] = useState(0)
   const reportsPerPage = 10
 
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; reportId: string | null; reportDate: string | null }>({
+    show: false,
+    reportId: null,
+    reportDate: null
+  })
+  const [deleting, setDeleting] = useState(false)
+
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true)
@@ -199,6 +207,43 @@ export default function DashboardContent({ user }: DashboardContentProps) {
     }
   }
 
+  const handleDeleteClick = (e: React.MouseEvent, reportId: string, reportDate: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDeleteConfirm({ show: true, reportId, reportDate })
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm.reportId) return
+
+    try {
+      setDeleting(true)
+      const response = await fetch(`/api/reports/${deleteConfirm.reportId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to delete report')
+      }
+
+      // Refresh the reports list
+      await fetchDashboardData()
+      
+      // Close confirmation dialog
+      setDeleteConfirm({ show: false, reportId: null, reportDate: null })
+    } catch (error) {
+      console.error('Error deleting report:', error)
+      alert(error instanceof Error ? error.message : 'Failed to delete report')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirm({ show: false, reportId: null, reportDate: null })
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -291,11 +336,11 @@ export default function DashboardContent({ user }: DashboardContentProps) {
             </li>
           ) : (
             reports.map((report) => (
-              <li key={report.id}>
+              <li key={report.id} className="relative">
                 <Link href={`/reports/${report.id}`} className="block hover:bg-gray-50">
                   <div className="px-4 py-4 sm:px-6">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center">
+                      <div className="flex items-center flex-1">
                         <div className="flex-shrink-0">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(report.status)}`}>
                             {report.status}
@@ -310,16 +355,29 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                           </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-sm font-medium text-gray-900">
-                          {formatCurrency(report.gross_revenue || 0)} gross
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-gray-900">
+                            {formatCurrency(report.gross_revenue || 0)} gross
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {formatCurrency(report.net_revenue || 0)} net
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {formatCurrency(calculateTotalCash(report))} cash
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {formatCurrency(report.net_revenue || 0)} net
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          {formatCurrency(calculateTotalCash(report))} cash
-                        </div>
+                        {user.role === 'admin' && (
+                          <button
+                            onClick={(e) => handleDeleteClick(e, report.id, formatDate(report.for_date))}
+                            className="flex-shrink-0 p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
+                            title="Delete report"
+                          >
+                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -415,6 +473,44 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                   </svg>
                 </button>
               </nav>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.show && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" onClick={handleDeleteCancel}>
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white" onClick={(e) => e.stopPropagation()}>
+            <div className="mt-3">
+              <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full">
+                <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mt-4 text-center">Delete Report</h3>
+              <div className="mt-2 px-7 py-3">
+                <p className="text-sm text-gray-500 text-center">
+                  Are you sure you want to delete the report for <strong>{deleteConfirm.reportDate}</strong>? 
+                  This action cannot be undone and will remove all associated data.
+                </p>
+              </div>
+              <div className="flex items-center justify-end gap-3 px-4 py-3">
+                <button
+                  onClick={handleDeleteCancel}
+                  disabled={deleting}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  disabled={deleting}
+                  className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
