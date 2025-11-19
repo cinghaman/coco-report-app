@@ -230,30 +230,61 @@ export default function DashboardContent({ user }: DashboardContentProps) {
       const result = await response.json()
 
       // Send email notification if provided
-      if (result.emailNotification?.shouldSend && window.smtp) {
+      if (result.emailNotification?.shouldSend) {
         try {
-          const { to, subject, html } = result.emailNotification
-          
-          // Send to each admin email
-          const emailPromises = (Array.isArray(to) ? to : [to]).map(email => 
-            window.smtp.mail({
-              secure: true,
-              host: process.env.NEXT_PUBLIC_SMTP_HOST,
-              to: email,
-              from: `"Coco Reporting" <${process.env.NEXT_PUBLIC_SMTP_USERNAME}>`,
-              subject: subject,
-              body: html,
-              username: process.env.NEXT_PUBLIC_SMTP_USERNAME,
-              password: process.env.NEXT_PUBLIC_SMTP_PASSWORD,
-              encrypted: true
-            }).catch(err => {
-              console.error(`Failed to send email to ${email}:`, err)
-              return null
-            })
-          )
+          // Wait for SMTP to be available
+          let smtpAvailable = window.smtp
+          if (!smtpAvailable) {
+            console.log('SMTP not available, waiting...')
+            for (let i = 0; i < 50; i++) {
+              await new Promise(resolve => setTimeout(resolve, 100))
+              if (window.smtp) {
+                smtpAvailable = window.smtp
+                break
+              }
+            }
+          }
 
-          await Promise.all(emailPromises)
-          console.log(`Email notifications sent to ${(Array.isArray(to) ? to : [to]).length} admin(s)`)
+          if (smtpAvailable) {
+            const { to, subject, html } = result.emailNotification
+            const smtpHost = process.env.NEXT_PUBLIC_SMTP_HOST
+            const smtpUsername = process.env.NEXT_PUBLIC_SMTP_USERNAME
+            const smtpPassword = process.env.NEXT_PUBLIC_SMTP_PASSWORD
+
+            if (smtpHost && smtpUsername && smtpPassword) {
+              console.log('Sending deletion email notifications to:', Array.isArray(to) ? to : [to])
+              
+              // Send to each admin email
+              const emailPromises = (Array.isArray(to) ? to : [to]).map(async (email) => {
+                try {
+                  const result = await window.smtp!.mail({
+                    secure: true,
+                    host: smtpHost,
+                    to: email,
+                    from: `"Coco Reporting" <${smtpUsername}>`,
+                    subject: subject,
+                    body: html,
+                    username: smtpUsername,
+                    password: smtpPassword,
+                    encrypted: true
+                  })
+                  console.log(`Deletion email sent successfully to ${email}`)
+                  return result
+                } catch (err) {
+                  console.error(`Failed to send email to ${email}:`, err)
+                  return null
+                }
+              })
+
+              const results = await Promise.all(emailPromises)
+              const successCount = results.filter(r => r !== null).length
+              console.log(`Deletion email notifications: ${successCount}/${(Array.isArray(to) ? to : [to]).length} sent successfully`)
+            } else {
+              console.error('SMTP configuration missing - cannot send deletion email')
+            }
+          } else {
+            console.warn('SMTP Mailer not available - cannot send deletion email notification')
+          }
         } catch (emailError) {
           console.error('Failed to send email notification:', emailError)
           // Don't fail the deletion if email fails
