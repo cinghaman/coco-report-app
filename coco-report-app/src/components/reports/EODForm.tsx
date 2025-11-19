@@ -642,32 +642,51 @@ export default function EODForm({ user, initialData }: EODFormProps) {
           const smtpHost = process.env.NEXT_PUBLIC_SMTP_HOST
           const smtpUsername = process.env.NEXT_PUBLIC_SMTP_USERNAME
           const smtpPassword = process.env.NEXT_PUBLIC_SMTP_PASSWORD
+          const smtpService = process.env.NEXT_PUBLIC_SMTP_SERVICE // Optional: e.g. 'gmail'
+          const smtpPort = process.env.NEXT_PUBLIC_SMTP_PORT ? parseInt(process.env.NEXT_PUBLIC_SMTP_PORT) : undefined
 
           console.log('SMTP Config:', {
             host: smtpHost ? `${smtpHost.substring(0, 10)}...` : 'NOT SET',
             username: smtpUsername ? `${smtpUsername.substring(0, 5)}...` : 'NOT SET',
             password: smtpPassword ? 'SET' : 'NOT SET',
+            service: smtpService || 'NOT SET',
+            port: smtpPort || 'NOT SET',
             smtpAvailable: !!smtpAvailable
           })
 
           // Send email to all admins
-          if (smtpAvailable && smtpHost && smtpUsername && smtpPassword) {
+          if (smtpAvailable && smtpUsername && smtpPassword) {
             console.log('Sending emails to:', recipientEmails)
             // Send to each admin email
             const emailPromises = recipientEmails.map(async (email) => {
               try {
                 console.log(`Attempting to send email to ${email}...`)
-                const result = await window.smtp.mail({
-                  secure: true,
-                  host: smtpHost,
+                
+                // Build email options - use service if provided, otherwise use host/port
+                const emailOptions: any = {
                   to: email,
                   from: `"Coco Reporting" <${smtpUsername}>`,
                   subject: subject,
                   body: body,
                   username: smtpUsername,
                   password: smtpPassword,
-                  encrypted: true
-                })
+                  encrypted: true // Use encrypted password
+                }
+
+                // Use service if provided (simpler), otherwise use host/port
+                if (smtpService) {
+                  emailOptions.service = smtpService
+                } else if (smtpHost) {
+                  emailOptions.host = smtpHost
+                  emailOptions.secure = true
+                  if (smtpPort) {
+                    emailOptions.port = smtpPort
+                  }
+                } else {
+                  throw new Error('Either NEXT_PUBLIC_SMTP_SERVICE or NEXT_PUBLIC_SMTP_HOST must be set')
+                }
+
+                const result = await window.smtp.mail(emailOptions)
                 console.log(`Email sent successfully to ${email}:`, result)
                 return result
               } catch (err) {
@@ -682,9 +701,9 @@ export default function EODForm({ user, initialData }: EODFormProps) {
           } else {
             const missing = []
             if (!smtpAvailable) missing.push('SMTP script')
-            if (!smtpHost) missing.push('NEXT_PUBLIC_SMTP_HOST')
             if (!smtpUsername) missing.push('NEXT_PUBLIC_SMTP_USERNAME')
             if (!smtpPassword) missing.push('NEXT_PUBLIC_SMTP_PASSWORD')
+            if (!smtpService && !smtpHost) missing.push('NEXT_PUBLIC_SMTP_SERVICE or NEXT_PUBLIC_SMTP_HOST')
             console.error('Cannot send email - missing:', missing.join(', '))
           }
 

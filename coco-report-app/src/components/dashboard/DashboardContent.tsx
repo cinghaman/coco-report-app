@@ -250,24 +250,38 @@ export default function DashboardContent({ user }: DashboardContentProps) {
             const smtpHost = process.env.NEXT_PUBLIC_SMTP_HOST
             const smtpUsername = process.env.NEXT_PUBLIC_SMTP_USERNAME
             const smtpPassword = process.env.NEXT_PUBLIC_SMTP_PASSWORD
+            const smtpService = process.env.NEXT_PUBLIC_SMTP_SERVICE
+            const smtpPort = process.env.NEXT_PUBLIC_SMTP_PORT ? parseInt(process.env.NEXT_PUBLIC_SMTP_PORT) : undefined
 
-            if (smtpHost && smtpUsername && smtpPassword) {
+            if (smtpUsername && smtpPassword && (smtpService || smtpHost)) {
               console.log('Sending deletion email notifications to:', Array.isArray(to) ? to : [to])
               
               // Send to each admin email
               const emailPromises = (Array.isArray(to) ? to : [to]).map(async (email) => {
                 try {
-                  const result = await window.smtp!.mail({
-                    secure: true,
-                    host: smtpHost,
+                  // Build email options - use service if provided, otherwise use host/port
+                  const emailOptions: any = {
                     to: email,
                     from: `"Coco Reporting" <${smtpUsername}>`,
                     subject: subject,
                     body: html,
                     username: smtpUsername,
                     password: smtpPassword,
-                    encrypted: true
-                  })
+                    encrypted: true // Use encrypted password
+                  }
+
+                  // Use service if provided (simpler), otherwise use host/port
+                  if (smtpService) {
+                    emailOptions.service = smtpService
+                  } else if (smtpHost) {
+                    emailOptions.host = smtpHost
+                    emailOptions.secure = true
+                    if (smtpPort) {
+                      emailOptions.port = smtpPort
+                    }
+                  }
+
+                  const result = await window.smtp!.mail(emailOptions)
                   console.log(`Deletion email sent successfully to ${email}`)
                   return result
                 } catch (err) {
@@ -281,6 +295,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
               console.log(`Deletion email notifications: ${successCount}/${(Array.isArray(to) ? to : [to]).length} sent successfully`)
             } else {
               console.error('SMTP configuration missing - cannot send deletion email')
+              console.log('Required: NEXT_PUBLIC_SMTP_USERNAME, NEXT_PUBLIC_SMTP_PASSWORD, and (NEXT_PUBLIC_SMTP_SERVICE or NEXT_PUBLIC_SMTP_HOST)')
             }
           } else {
             console.warn('SMTP Mailer not available - cannot send deletion email notification')

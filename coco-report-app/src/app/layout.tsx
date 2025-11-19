@@ -24,7 +24,7 @@ export default function RootLayout({
         </div>
         <Script 
           id="smtp-mailer-script"
-          src="https://smtpmailer.vercel.app/cdn.js" 
+          src="https://smtpmailer.vercel.app/cdn.js"
           strategy="afterInteractive"
         />
         <SMTPLoader />
