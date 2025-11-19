@@ -639,12 +639,24 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               }),
             })
 
+            const emailResult = await emailResponse.json()
+            
             if (emailResponse.ok) {
-              const emailResult = await emailResponse.json()
               console.log('Email notifications:', emailResult.message)
+              if (emailResult.results) {
+                emailResult.results.forEach((r: any) => {
+                  if (r.success) {
+                    console.log(`✓ Email sent to ${r.recipient}`)
+                  } else {
+                    console.error(`✗ Failed to send to ${r.recipient}:`, r.error, r.status || '')
+                  }
+                })
+              }
             } else {
-              const errorData = await emailResponse.json()
-              console.error('Failed to send email notifications:', errorData)
+              console.error('Failed to send email notifications:', emailResult)
+              if (emailResult.config) {
+                console.error('SMTP Config Status:', emailResult.config)
+              }
             }
           } catch (emailError) {
             console.error('Error sending email notifications:', emailError)

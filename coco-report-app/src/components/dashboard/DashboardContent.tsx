@@ -248,12 +248,24 @@ export default function DashboardContent({ user }: DashboardContentProps) {
             }),
           })
 
+          const emailResult = await emailResponse.json()
+          
           if (emailResponse.ok) {
-            const emailResult = await emailResponse.json()
             console.log('Deletion email notifications:', emailResult.message)
+            if (emailResult.results) {
+              emailResult.results.forEach((r: any) => {
+                if (r.success) {
+                  console.log(`✓ Deletion email sent to ${r.recipient}`)
+                } else {
+                  console.error(`✗ Failed to send deletion email to ${r.recipient}:`, r.error, r.status || '')
+                }
+              })
+            }
           } else {
-            const errorData = await emailResponse.json()
-            console.error('Failed to send deletion email notifications:', errorData)
+            console.error('Failed to send deletion email notifications:', emailResult)
+            if (emailResult.config) {
+              console.error('SMTP Config Status:', emailResult.config)
+            }
           }
         } catch (emailError) {
           console.error('Failed to send email notification:', emailError)
