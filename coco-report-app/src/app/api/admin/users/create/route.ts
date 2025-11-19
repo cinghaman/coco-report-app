@@ -63,27 +63,60 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: createError.message }, { status: 400 })
         }
 
-        // 4. Update the user profile in public.users if needed
-        // The trigger might handle insertion, but we might want to ensure fields are set correctly
-        // especially 'approved' status since an admin is creating them.
-
-        // Wait a brief moment for trigger to potentially run (optional, but sometimes helpful)
-        // Or just upsert the profile to be sure.
+        // 4. Upsert the user profile in public.users
+        // The trigger handles insertion, but we need to ensure fields are set correctly
+        // especially 'approved' status and role since an admin is creating them.
         if (newUser.user) {
+            // Validate role
+            const validRoles: ('staff' | 'admin' | 'owner')[] = ['staff', 'admin', 'owner']
+            const userRole: 'staff' | 'admin' | 'owner' = validRoles.includes(role as any) 
+                ? (role as 'staff' | 'admin' | 'owner') 
+                : 'staff'
+            
+            // Wait a moment for trigger to complete (if it hasn't already)
+            await new Promise(resolve => setTimeout(resolve, 200))
+            
+            // Use upsert which handles both insert and update, and Supabase handles enum types
             const { error: profileError } = await supabaseAdmin
                 .from('users')
-                .update({
+                .upsert({
+                    id: newUser.user.id,
+                    email: email,
                     display_name: displayName,
-                    role: role,
+                    role: userRole,
                     approved: true, // Auto-approve since admin created it
                     approved_by: user.id,
-                    approved_at: new Date().toISOString()
+                    approved_at: new Date().toISOString(),
+                    venue_ids: []
+                }, {
+                    onConflict: 'id'
                 })
-                .eq('id', newUser.user.id)
 
             if (profileError) {
-                console.error('Error updating user profile:', profileError)
-                // Don't fail the request if just profile update fails, but log it
+                console.error('Error upserting user profile:', profileError)
+                // If upsert fails due to enum type, try using RPC function as fallback
+                if (profileError.message?.includes('user_role') || profileError.message?.includes('type')) {
+                    const { error: rpcError } = await supabaseAdmin.rpc('update_user_profile', {
+                        p_user_id: newUser.user.id,
+                        p_display_name: displayName,
+                        p_role: userRole,
+                        p_approved: true,
+                        p_approved_by: user.id,
+                        p_approved_at: new Date().toISOString()
+                    })
+                    
+                    if (rpcError) {
+                        return NextResponse.json({ 
+                            error: 'Database error creating new user',
+                            details: rpcError.message 
+                        }, { status: 500 })
+                    }
+                } else {
+                    return NextResponse.json({ 
+                        error: 'Database error creating new user',
+                        details: profileError.message 
+                    }, { status: 500 })
+                }
             }
         }
 
