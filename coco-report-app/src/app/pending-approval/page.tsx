@@ -1,13 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase'
+import { createClientComponentClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
 export default function PendingApprovalPage() {
     const router = useRouter()
     const [email, setEmail] = useState<string>('')
-    const supabase = createClient()
+    const supabase = createClientComponentClient()
 
     useEffect(() => {
         const getUser = async () => {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase'
+import { createClientComponentClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
 interface User {
@@ -17,7 +17,7 @@ interface User {
 
 export default function UsersAdminPage() {
     const router = useRouter()
-    const supabase = createClient()
+    const supabase = createClientComponentClient()
     const [users, setUsers] = useState<User[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>('pending')
@@ -103,8 +103,8 @@ export default function UsersAdminPage() {
                             <button
                                 onClick={() => setFilter('pending')}
                                 className={`px-6 py-3 text-sm font-medium border-b-2 ${filter === 'pending'
-                                        ? 'border-blue-500 text-blue-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    ? 'border-blue-500 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                     }`}
                             >
                                 Pending ({pendingCount})
@@ -112,8 +112,8 @@ export default function UsersAdminPage() {
                             <button
                                 onClick={() => setFilter('approved')}
                                 className={`px-6 py-3 text-sm font-medium border-b-2 ${filter === 'approved'
-                                        ? 'border-blue-500 text-blue-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    ? 'border-blue-500 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                     }`}
                             >
                                 Approved
@@ -121,8 +121,8 @@ export default function UsersAdminPage() {
                             <button
                                 onClick={() => setFilter('all')}
                                 className={`px-6 py-3 text-sm font-medium border-b-2 ${filter === 'all'
-                                        ? 'border-blue-500 text-blue-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    ? 'border-blue-500 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                     }`}
                             >
                                 All Users
