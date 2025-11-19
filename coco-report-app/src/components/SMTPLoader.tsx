@@ -29,48 +29,12 @@ export default function SMTPLoader() {
     const checkSMTP = () => {
       if (typeof window === 'undefined') return false
 
-      // Check if script tag exists
-      const scriptTag = document.querySelector('script[src*="smtpmailer.vercel.app"]')
-      if (!scriptTag) {
-        console.warn('SMTP script tag not found in DOM')
-        return false
-      }
-
-      // Try different possible global names and check for mail method
-      const possibleNames = ['smtp', 'smtpmailer', 'SMTPMailer', 'SMTP']
-      for (const name of possibleNames) {
-        const obj = (window as any)[name]
-        if (obj && typeof obj === 'object') {
-          // Check if it has a mail method
-          if (typeof obj.mail === 'function') {
-            window.smtp = obj
-            console.log(`SMTP Mailer initialized successfully from window.${name}`)
-            return true
-          }
-          // Check if it's a constructor/class
-          if (typeof obj === 'function' && obj.prototype && typeof obj.prototype.mail === 'function') {
-            // Try to instantiate or use as static
-            try {
-              window.smtp = new obj() as any
-              console.log(`SMTP Mailer initialized from ${name} constructor`)
-              return true
-            } catch (e) {
-              // Try as static
-              if (typeof obj.mail === 'function') {
-                window.smtp = obj as any
-                console.log(`SMTP Mailer initialized from ${name} static`)
-                return true
-              }
-            }
-          }
-        }
-      }
-
-      // Debug: log what's actually on window
-      if (scriptTag.getAttribute('data-loaded') !== 'true') {
-        console.log('Available window properties:', Object.keys(window).filter(k => 
-          k.toLowerCase().includes('smtp') || k.toLowerCase().includes('mail')
-        ))
+      // The script exposes window.smtp with a mail method
+      // Check directly for window.smtp
+      if ((window as any).smtp && typeof (window as any).smtp === 'object' && typeof (window as any).smtp.mail === 'function') {
+        window.smtp = (window as any).smtp
+        console.log('SMTP Mailer initialized successfully - window.smtp found')
+        return true
       }
 
       return false
@@ -81,34 +45,78 @@ export default function SMTPLoader() {
       return
     }
 
-    // If not found, wait for script to load
+    // Wait for script to load - check more frequently at first
     let checkCount = 0
-    const maxChecks = 100 // 10 seconds at 100ms intervals
+    const maxChecks = 150 // 15 seconds at 100ms intervals
     const interval = setInterval(() => {
       checkCount++
       if (checkSMTP()) {
-        const scriptTag = document.querySelector('script[src*="smtpmailer.vercel.app"]')
-        if (scriptTag) {
-          scriptTag.setAttribute('data-loaded', 'true')
-        }
         clearInterval(interval)
-      } else if (checkCount >= maxChecks) {
-        clearInterval(interval)
-        const scriptTag = document.querySelector('script[src*="smtpmailer.vercel.app"]')
+        return
+      }
+      
+      // Log progress every 2 seconds
+      if (checkCount % 20 === 0) {
+        const scriptTag = document.querySelector('script[src*="smtpmailer.vercel.app"], script[id="smtp-mailer-script"]')
         if (scriptTag) {
-          console.error('SMTP Mailer script tag exists but API not found')
-          console.log('Script tag:', scriptTag)
-          console.log('Window object keys:', Object.keys(window).slice(0, 50))
+          console.log(`Waiting for SMTP script... (${checkCount * 0.1}s)`)
+          // Debug: check what's on window
+          if (checkCount === 20) {
+            const smtpRelated = Object.keys(window).filter(k => 
+              k.toLowerCase().includes('smtp') || k.toLowerCase().includes('mail')
+            )
+            console.log('SMTP-related window properties:', smtpRelated)
+            console.log('window.smtp exists?', typeof (window as any).smtp !== 'undefined')
+            if ((window as any).smtp) {
+              console.log('window.smtp type:', typeof (window as any).smtp)
+              console.log('window.smtp.mail exists?', typeof (window as any).smtp?.mail)
+            }
+          }
         } else {
-          console.error('SMTP Mailer script tag not found in DOM')
+          console.warn('SMTP script tag not found in DOM')
+        }
+      }
+
+      if (checkCount >= maxChecks) {
+        clearInterval(interval)
+        const scriptTag = document.querySelector('script[src*="smtpmailer.vercel.app"], script[id="smtp-mailer-script"]')
+        if (scriptTag) {
+          console.error('SMTP Mailer script tag exists but window.smtp not found after 15 seconds')
+          console.log('Script tag:', scriptTag.outerHTML.substring(0, 200))
+          console.log('Checking window.smtp:', {
+            exists: typeof (window as any).smtp !== 'undefined',
+            type: typeof (window as any).smtp,
+            hasMail: typeof (window as any).smtp?.mail === 'function'
+          })
+        } else {
+          console.error('SMTP Mailer script tag not found in DOM - script may not have loaded')
         }
       }
     }, 100)
 
-    // Also listen for script load event
-    const scriptTag = document.querySelector('script[src*="smtpmailer.vercel.app"]')
-    if (scriptTag) {
-      scriptTag.addEventListener('load', () => {
+    // Also try to manually inject the script if Next.js Script component isn't working
+    const existingScript = document.querySelector('script[src*="smtpmailer.vercel.app"], script[id="smtp-mailer-script"]')
+    if (!existingScript) {
+      console.log('SMTP script tag not found, attempting to load manually...')
+      const script = document.createElement('script')
+      script.id = 'smtp-mailer-script-manual'
+      script.src = 'https://smtpmailer.vercel.app/cdn.js'
+      script.async = true
+      script.onload = () => {
+        console.log('Manually loaded SMTP script - onload fired')
+        setTimeout(() => {
+          if (checkSMTP()) {
+            clearInterval(interval)
+          }
+        }, 500)
+      }
+      script.onerror = (e) => {
+        console.error('Manually loaded SMTP script failed:', e)
+      }
+      document.head.appendChild(script)
+    } else {
+      // Script tag exists, listen for load event
+      existingScript.addEventListener('load', () => {
         console.log('SMTP script load event fired')
         setTimeout(() => {
           if (checkSMTP()) {
@@ -116,9 +124,8 @@ export default function SMTPLoader() {
           }
         }, 500)
       })
-      scriptTag.addEventListener('error', (e) => {
+      existingScript.addEventListener('error', (e) => {
         console.error('SMTP script failed to load:', e)
-        clearInterval(interval)
       })
     }
 
