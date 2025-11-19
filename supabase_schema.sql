@@ -245,53 +245,153 @@ using (exists (select 1 from public.users u where u.id = auth.uid() and u.role i
 with check (exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','owner')));
 
 -- Field values follow report access
-create policy p_field_values_rw on public.report_field_values
-for all to authenticated
+create policy p_field_values_read on public.report_field_values
+for select to authenticated
 using (
   exists (select 1 from public.daily_reports r where r.id = report_id)
+);
+
+create policy p_field_values_write on public.report_field_values
+for all to authenticated
+using (
+  exists (
+    select 1 from public.daily_reports r 
+    where r.id = report_id 
+      and (
+        (r.status = 'draft' and r.created_by = auth.uid())
+        or exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','owner'))
+      )
+  )
 )
 with check (
-  exists (select 1 from public.daily_reports r where r.id = report_id)
+  exists (
+    select 1 from public.daily_reports r 
+    where r.id = report_id 
+      and (
+        (r.status = 'draft' and r.created_by = auth.uid())
+        or exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','owner'))
+      )
+  )
 );
 
 -- Withdrawals follow report access
-create policy p_withdrawals_rw on public.report_withdrawals
-for all to authenticated
+create policy p_withdrawals_read on public.report_withdrawals
+for select to authenticated
 using (
   exists (select 1 from public.daily_reports r where r.id = report_id)
+);
+
+create policy p_withdrawals_write on public.report_withdrawals
+for all to authenticated
+using (
+  exists (
+    select 1 from public.daily_reports r 
+    where r.id = report_id 
+      and (
+        (r.status = 'draft' and r.created_by = auth.uid())
+        or exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','owner'))
+      )
+  )
 )
 with check (
-  exists (select 1 from public.daily_reports r where r.id = report_id)
+  exists (
+    select 1 from public.daily_reports r 
+    where r.id = report_id 
+      and (
+        (r.status = 'draft' and r.created_by = auth.uid())
+        or exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','owner'))
+      )
+  )
 );
 
 -- Representacja 1 entries follow report access
-create policy p_representacja_1_rw on public.report_representacja_1
-for all to authenticated
+create policy p_representacja_1_read on public.report_representacja_1
+for select to authenticated
 using (
   exists (select 1 from public.daily_reports r where r.id = report_id)
+);
+
+create policy p_representacja_1_write on public.report_representacja_1
+for all to authenticated
+using (
+  exists (
+    select 1 from public.daily_reports r 
+    where r.id = report_id 
+      and (
+        (r.status = 'draft' and r.created_by = auth.uid())
+        or exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','owner'))
+      )
+  )
 )
 with check (
-  exists (select 1 from public.daily_reports r where r.id = report_id)
+  exists (
+    select 1 from public.daily_reports r 
+    where r.id = report_id 
+      and (
+        (r.status = 'draft' and r.created_by = auth.uid())
+        or exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','owner'))
+      )
+  )
 );
 
 -- Service Kwotowy entries follow report access
-create policy p_service_kwotowy_rw on public.report_service_kwotowy
-for all to authenticated
+create policy p_service_kwotowy_read on public.report_service_kwotowy
+for select to authenticated
 using (
-  exists (select 1 from public.daily_reports r where r.id = report_id)
-)
-with check (
   exists (select 1 from public.daily_reports r where r.id = report_id)
 );
 
--- Strata entries follow report access
-create policy p_strata_rw on public.report_strata
+create policy p_service_kwotowy_write on public.report_service_kwotowy
 for all to authenticated
 using (
-  exists (select 1 from public.daily_reports r where r.id = report_id)
+  exists (
+    select 1 from public.daily_reports r 
+    where r.id = report_id 
+      and (
+        (r.status = 'draft' and r.created_by = auth.uid())
+        or exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','owner'))
+      )
+  )
 )
 with check (
+  exists (
+    select 1 from public.daily_reports r 
+    where r.id = report_id 
+      and (
+        (r.status = 'draft' and r.created_by = auth.uid())
+        or exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','owner'))
+      )
+  )
+);
+
+-- Strata entries follow report access
+create policy p_strata_read on public.report_strata
+for select to authenticated
+using (
   exists (select 1 from public.daily_reports r where r.id = report_id)
+);
+
+create policy p_strata_write on public.report_strata
+for all to authenticated
+using (
+  exists (
+    select 1 from public.daily_reports r 
+    where r.id = report_id 
+      and (
+        (r.status = 'draft' and r.created_by = auth.uid())
+        or exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','owner'))
+      )
+  )
+)
+with check (
+  exists (
+    select 1 from public.daily_reports r 
+    where r.id = report_id 
+      and (
+        (r.status = 'draft' and r.created_by = auth.uid())
+        or exists (select 1 from public.users u where u.id = auth.uid() and u.role in ('admin','owner'))
+      )
+  )
 );
 
 -- Audit logs readable by admin/owner; insert by server via rpc
@@ -502,3 +602,30 @@ insert into public.venues (name) values ('Coco Chemilina') on conflict do nothin
 -- insert into public.users (id,email,display_name,role,venue_ids)
 -- values ('<auth.uuid>', 'admin@coco.local','Admin','admin', array[(select id from venues where name = 'Coco Lounge'),
 --                                                                  (select id from venues where name = 'Coco Chemilina')]);
+
+
+-- === TRIGGERS & FUNCTIONS FOR AUTH ===
+
+-- Function to handle new user signup
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.users (id, email, display_name, role, venue_ids)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', new.email),
+    'staff', -- default role
+    '{}'::uuid[]
+  );
+  return new;
+end;
+$$;
+
+-- Trigger to call the function on new user creation
+create or replace trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();

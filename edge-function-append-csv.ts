@@ -9,12 +9,25 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const authHeader = req.headers.get('Authorization');
+
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing Authorization header" }), { status: 401 });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
     const { report_id } = await req.json();
 
+    if (!report_id) {
+      return new Response(JSON.stringify({ error: "Missing report_id" }), { status: 400 });
+    }
+
     // Fetch report + venue + custom fields flattened
+    // RLS will ensure the user can only see reports they are allowed to see.
     const { data: report, error } = await supabase
       .from("daily_reports")
       .select(`*, venues!inner(name, slug)`)
@@ -22,7 +35,7 @@ serve(async (req) => {
       .single();
 
     if (error || !report) {
-      return new Response(JSON.stringify({ error: error?.message || "Report not found" }), { status: 400 });
+      return new Response(JSON.stringify({ error: error?.message || "Report not found or access denied" }), { status: 400 });
     }
 
     // Pull custom field values
@@ -89,19 +102,23 @@ serve(async (req) => {
       csv = await existing.text();
     } else {
       // create header
-      csv = Object.keys(row).join(",") + "\n";
+      csv = Object.keys(row).join(",") + "
+";
     }
 
     const escape = (v: any) => {
       if (v === null || v === undefined) return "";
       const s = String(v);
-      return /[",\n]/.test(s) ? `"\${s.replace(/"/g, '""')}"` : s;
+      return /[",
+]/.test(s) ? `"\${s.replace(/"/g, '""')}"` : s;
     };
 
-    const line = Object.keys(row).map(k => escape(row[k as keyof typeof row])).join(",") + "\n";
+    const line = Object.keys(row).map(k => escape(row[k as keyof typeof row])).join(",") + "
+";
     csv += line;
 
     // Upload back
+    // Note: User must have RLS permission to upload to 'coco-reports' bucket.
     const blob = new Blob([csv], { type: "text/csv" });
     const { error: uploadError } = await supabase.storage
       .from("coco-reports")
