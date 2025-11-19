@@ -20,16 +20,39 @@ export async function POST(request: NextRequest) {
     }
 
     // Get SMTP configuration from environment variables
-    const smtpHost = process.env.NEXT_PUBLIC_SMTP_HOST
-    const smtpUsername = process.env.NEXT_PUBLIC_SMTP_USERNAME
-    const smtpPassword = process.env.NEXT_PUBLIC_SMTP_PASSWORD
-    const smtpService = process.env.NEXT_PUBLIC_SMTP_SERVICE
-    const smtpPort = process.env.NEXT_PUBLIC_SMTP_PORT ? parseInt(process.env.NEXT_PUBLIC_SMTP_PORT) : undefined
+    // Note: NEXT_PUBLIC_ vars are available on server, but we should also check non-prefixed versions
+    const smtpHost = process.env.NEXT_PUBLIC_SMTP_HOST || process.env.SMTP_HOST
+    const smtpUsername = process.env.NEXT_PUBLIC_SMTP_USERNAME || process.env.SMTP_USERNAME
+    const smtpPassword = process.env.NEXT_PUBLIC_SMTP_PASSWORD || process.env.SMTP_PASSWORD
+    const smtpService = process.env.NEXT_PUBLIC_SMTP_SERVICE || process.env.SMTP_SERVICE
+    const smtpPort = (process.env.NEXT_PUBLIC_SMTP_PORT || process.env.SMTP_PORT) 
+      ? parseInt(process.env.NEXT_PUBLIC_SMTP_PORT || process.env.SMTP_PORT || '465') 
+      : undefined
+
+    console.log('SMTP Config Check:', {
+      hasHost: !!smtpHost,
+      hasUsername: !!smtpUsername,
+      hasPassword: !!smtpPassword,
+      hasService: !!smtpService,
+      port: smtpPort
+    })
 
     if (!smtpUsername || !smtpPassword || (!smtpService && !smtpHost)) {
+      console.error('SMTP configuration missing:', {
+        username: !!smtpUsername,
+        password: !!smtpPassword,
+        service: !!smtpService,
+        host: !!smtpHost
+      })
       return NextResponse.json({ 
         error: 'SMTP configuration missing',
-        details: 'NEXT_PUBLIC_SMTP_USERNAME, NEXT_PUBLIC_SMTP_PASSWORD, and (NEXT_PUBLIC_SMTP_SERVICE or NEXT_PUBLIC_SMTP_HOST) must be set'
+        details: 'NEXT_PUBLIC_SMTP_USERNAME, NEXT_PUBLIC_SMTP_PASSWORD, and (NEXT_PUBLIC_SMTP_SERVICE or NEXT_PUBLIC_SMTP_HOST) must be set',
+        config: {
+          hasUsername: !!smtpUsername,
+          hasPassword: !!smtpPassword,
+          hasService: !!smtpService,
+          hasHost: !!smtpHost
+        }
       }, { status: 500 })
     }
 
@@ -66,6 +89,21 @@ export async function POST(request: NextRequest) {
           to: recipient
         }
 
+        // Remove 'to' from the array format since we're sending to a single recipient
+        delete singleEmailOptions.to
+        singleEmailOptions.to = recipient
+
+        console.log(`Sending email to ${recipient} with options:`, {
+          to: recipient,
+          from: singleEmailOptions.from,
+          subject: singleEmailOptions.subject,
+          hasUsername: !!singleEmailOptions.username,
+          hasPassword: !!singleEmailOptions.password,
+          encrypted: singleEmailOptions.encrypted,
+          service: singleEmailOptions.service,
+          host: singleEmailOptions.host
+        })
+
         const response = await fetch('https://smtpmailer.vercel.app/api/smtpmailer', {
           method: 'POST',
           headers: {
@@ -77,19 +115,33 @@ export async function POST(request: NextRequest) {
 
         if (!response.ok) {
           const errorText = await response.text()
-          console.error(`Failed to send email to ${recipient}:`, response.status, errorText)
-          results.push({ recipient, success: false, error: errorText })
+          console.error(`Failed to send email to ${recipient}:`, {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText
+          })
+          results.push({ 
+            recipient, 
+            success: false, 
+            error: errorText,
+            status: response.status,
+            statusText: response.statusText
+          })
         } else {
           const result = await response.json()
-          console.log(`Email sent successfully to ${recipient}`)
+          console.log(`Email sent successfully to ${recipient}:`, result)
           results.push({ recipient, success: true, result })
         }
       } catch (error) {
-        console.error(`Error sending email to ${recipient}:`, error)
+        console.error(`Error sending email to ${recipient}:`, {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined
+        })
         results.push({ 
           recipient, 
           success: false, 
-          error: error instanceof Error ? error.message : 'Unknown error' 
+          error: error instanceof Error ? error.message : 'Unknown error',
+          errorType: error instanceof Error ? error.constructor.name : typeof error
         })
       }
     }
