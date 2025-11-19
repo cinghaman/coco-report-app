@@ -19,10 +19,10 @@ export default function LoginPage() {
         console.error('Supabase client not available')
         return
       }
-      
+
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
-        
+
         if (session) {
           router.push('/dashboard')
         }
@@ -57,7 +57,7 @@ export default function LoginPage() {
 
       if (data.user) {
         setMessage('✅ Successfully signed in! Redirecting...')
-        
+
         // Use Next.js router for navigation
         setTimeout(() => {
           router.push('/dashboard')
@@ -82,7 +82,7 @@ export default function LoginPage() {
             Sign in to your account
           </p>
         </div>
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
@@ -173,14 +173,6 @@ export default function LoginPage() {
               <img className="h-5 w-5 mr-2" src="https://cdn.auth0.com/styleguide/components/1.0.8/media/logos/img/badge.png" alt="Auth0 Logo" />
               Sign in with Auth0
             </button>
-          </div>
-
-          <div className="mt-6 p-4 bg-gray-100 rounded-md">
-            <h3 className="text-sm font-medium text-gray-900 mb-2">Demo Accounts:</h3>
-            <div className="text-xs text-gray-600 space-y-1">
-              <div><strong>Admin:</strong> admin@thoughtbulb.dev / password123</div>
-              <div><strong>Staff:</strong> staff@example.com / password123</div>
-            </div>
           </div>
         </form>
       </div>
