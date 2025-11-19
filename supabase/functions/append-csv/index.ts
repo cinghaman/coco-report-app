@@ -102,19 +102,16 @@ serve(async (req) => {
       csv = await existing.text();
     } else {
       // create header
-      csv = Object.keys(row).join(",") + "
-";
+      csv = Object.keys(row).join(",") + "\n";
     }
 
     const escape = (v: any) => {
       if (v === null || v === undefined) return "";
       const s = String(v);
-      return /[",
-]/.test(s) ? `"\${s.replace(/"/g, '""')}"` : s;
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
 
-    const line = Object.keys(row).map(k => escape(row[k as keyof typeof row])).join(",") + "
-";
+    const line = Object.keys(row).map(k => escape(row[k as keyof typeof row])).join(",") + "\n";
     csv += line;
 
     // Upload back
