@@ -42,7 +42,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Send custom email using Resend with the reset link
-    const resendApiKey = process.env.RESEND_API_KEY || 're_SPU1Jcrd_6ks1XjygnTFMkcnKaWQNmDN6'
+    const resendApiKey = process.env.RESEND_API_KEY
+
+    if (!resendApiKey) {
+      console.error('Resend API key not configured')
+      // Still return success to prevent email enumeration
+      return NextResponse.json({ 
+        message: 'If an account exists with this email, a password reset link has been sent.'
+      })
+    }
+
     const resend = new Resend(resendApiKey)
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'
     const fromName = process.env.RESEND_FROM_NAME || 'Coco Reporting'

@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get Resend API key from environment variables
-    const resendApiKey = process.env.RESEND_API_KEY || 're_SPU1Jcrd_6ks1XjygnTFMkcnKaWQNmDN6'
+    const resendApiKey = process.env.RESEND_API_KEY
 
     if (!resendApiKey) {
       console.error('Resend API key not configured')
