@@ -140,24 +140,42 @@ export async function DELETE(
       const adminEmails = adminUsers?.map(u => u.email).filter(Boolean) || []
       const reportDate = new Date(report.for_date).toLocaleDateString('pl-PL')
 
-      // Return email data so client can send it (since SMTP mailer is client-side)
+      // Send email notification via API
+      if (adminEmails.length > 0) {
+        try {
+          const emailResponse = await fetch(`${request.nextUrl.origin}/api/send-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: adminEmails,
+              subject: `Report Deleted - ${venueName} - ${reportDate}`,
+              html: `
+                <h2>Report Deleted</h2>
+                <p><strong>Venue:</strong> ${venueName}</p>
+                <p><strong>Date:</strong> ${reportDate}</p>
+                <p><strong>Deleted by:</strong> ${currentUser.email}</p>
+                <p><strong>Gross Revenue:</strong> ${(report.gross_revenue || 0).toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}</p>
+                <p><strong>Net Revenue:</strong> ${(report.net_revenue || 0).toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}</p>
+                <p>This report and all associated data have been permanently deleted.</p>
+              `
+            })
+          })
+
+          if (emailResponse.ok) {
+            console.log('Deletion email notifications sent successfully')
+          } else {
+            const errorData = await emailResponse.json()
+            console.error('Failed to send deletion email notifications:', errorData)
+          }
+        } catch (emailError) {
+          console.error('Error sending deletion email notification:', emailError)
+          // Don't fail the deletion if email fails
+        }
+      }
+
       return NextResponse.json({ 
         message: 'Report deleted successfully',
-        reportId,
-        emailNotification: {
-          shouldSend: true,
-          to: adminEmails,
-          subject: `Report Deleted - ${venueName} - ${reportDate}`,
-          html: `
-            <h2>Report Deleted</h2>
-            <p><strong>Venue:</strong> ${venueName}</p>
-            <p><strong>Date:</strong> ${reportDate}</p>
-            <p><strong>Deleted by:</strong> ${currentUser.email}</p>
-            <p><strong>Gross Revenue:</strong> ${(report.gross_revenue || 0).toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}</p>
-            <p><strong>Net Revenue:</strong> ${(report.net_revenue || 0).toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}</p>
-            <p>This report and all associated data have been permanently deleted.</p>
-          `
-        }
+        reportId 
       })
     } catch (emailError) {
       // Don't fail the deletion if email notification fails

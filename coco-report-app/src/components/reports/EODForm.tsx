@@ -10,25 +10,6 @@ interface EODFormProps {
   initialData?: Record<string, unknown> // For editing existing reports
 }
 
-declare global {
-  interface Window {
-    smtp: {
-      mail: (options: {
-        secure?: boolean
-        host?: string
-        port?: number
-        to: string
-        from: string
-        subject: string
-        body: string
-        username?: string
-        password?: string
-        encrypted?: boolean
-      }) => Promise<string>
-    }
-  }
-}
-
 interface FormData {
   venue_id: string
   for_date: string
@@ -602,7 +583,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
           // Fallback to default email if no admins found
           const recipientEmails = adminEmails.length > 0 
             ? adminEmails 
-            : [process.env.NEXT_PUBLIC_SMTP_TO_EMAIL || 'shetty.aneet@gmail.com']
+            : ['shetty.aneet@gmail.com']
 
           console.log('Preparing to send email notifications to:', recipientEmails)
 
@@ -654,9 +635,6 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               }
             } else {
               console.error('Failed to send email notifications:', emailResult)
-              if (emailResult.config) {
-                console.error('SMTP Config Status:', emailResult.config)
-              }
             }
           } catch (emailError) {
             console.error('Error sending email notifications:', emailError)

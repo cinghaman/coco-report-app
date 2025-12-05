@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/auth'
+import { Resend } from 'resend'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,136 +13,62 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { to, subject, html, emailOptions } = body
+    const { to, subject, html } = body
 
-    // Support both simple format (to, subject, html) and full emailOptions
-    if (!emailOptions && (!to || !subject || !html)) {
+    if (!to || !subject || !html) {
       return NextResponse.json({ error: 'Missing required fields: to, subject, html' }, { status: 400 })
     }
 
-    // Get SMTP configuration from environment variables
-    // Note: NEXT_PUBLIC_ vars are available on server, but we should also check non-prefixed versions
-    const smtpHost = process.env.NEXT_PUBLIC_SMTP_HOST || process.env.SMTP_HOST
-    const smtpUsername = process.env.NEXT_PUBLIC_SMTP_USERNAME || process.env.SMTP_USERNAME
-    const smtpPassword = process.env.NEXT_PUBLIC_SMTP_PASSWORD || process.env.SMTP_PASSWORD
-    const smtpService = process.env.NEXT_PUBLIC_SMTP_SERVICE || process.env.SMTP_SERVICE
-    const smtpPort = (process.env.NEXT_PUBLIC_SMTP_PORT || process.env.SMTP_PORT) 
-      ? parseInt(process.env.NEXT_PUBLIC_SMTP_PORT || process.env.SMTP_PORT || '465') 
-      : undefined
+    // Get Resend API key from environment variables
+    const resendApiKey = process.env.RESEND_API_KEY
 
-    console.log('SMTP Config Check:', {
-      hasHost: !!smtpHost,
-      hasUsername: !!smtpUsername,
-      hasPassword: !!smtpPassword,
-      hasService: !!smtpService,
-      port: smtpPort
-    })
-
-    if (!smtpUsername || !smtpPassword || (!smtpService && !smtpHost)) {
-      console.error('SMTP configuration missing:', {
-        username: !!smtpUsername,
-        password: !!smtpPassword,
-        service: !!smtpService,
-        host: !!smtpHost
-      })
+    if (!resendApiKey) {
+      console.error('Resend API key not configured')
       return NextResponse.json({ 
-        error: 'SMTP configuration missing',
-        details: 'NEXT_PUBLIC_SMTP_USERNAME, NEXT_PUBLIC_SMTP_PASSWORD, and (NEXT_PUBLIC_SMTP_SERVICE or NEXT_PUBLIC_SMTP_HOST) must be set',
-        config: {
-          hasUsername: !!smtpUsername,
-          hasPassword: !!smtpPassword,
-          hasService: !!smtpService,
-          hasHost: !!smtpHost
-        }
+        error: 'Email service not configured',
+        details: 'RESEND_API_KEY environment variable must be set'
       }, { status: 500 })
     }
 
-    // Build email options
-    const mailOptions: any = emailOptions || {
-      to: Array.isArray(to) ? to : [to],
-      from: `"Coco Reporting" <${smtpUsername}>`,
-      subject: subject,
-      body: html,
-      username: smtpUsername,
-      password: smtpPassword,
-      encrypted: true
-    }
+    // Initialize Resend
+    const resend = new Resend(resendApiKey)
 
-    // Add service or host/port
-    if (smtpService) {
-      mailOptions.service = smtpService
-    } else if (smtpHost) {
-      mailOptions.host = smtpHost
-      mailOptions.secure = true
-      if (smtpPort) {
-        mailOptions.port = smtpPort
-      }
-    }
+    // Get from email from environment or use default
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'
+    const fromName = process.env.RESEND_FROM_NAME || 'Coco Reporting'
 
-    // Send emails - handle both single and array of recipients
-    const recipients = Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to]
+    // Handle both single and array of recipients
+    const recipients = Array.isArray(to) ? to : [to]
     const results = []
 
     for (const recipient of recipients) {
       try {
-        const singleEmailOptions = {
-          ...mailOptions,
-          to: recipient
-        }
+        console.log(`Sending email to ${recipient}`)
 
-        // Remove 'to' from the array format since we're sending to a single recipient
-        delete singleEmailOptions.to
-        singleEmailOptions.to = recipient
-
-        console.log(`Sending email to ${recipient} with options:`, {
+        const { data, error } = await resend.emails.send({
+          from: `${fromName} <${fromEmail}>`,
           to: recipient,
-          from: singleEmailOptions.from,
-          subject: singleEmailOptions.subject,
-          hasUsername: !!singleEmailOptions.username,
-          hasPassword: !!singleEmailOptions.password,
-          encrypted: singleEmailOptions.encrypted,
-          service: singleEmailOptions.service,
-          host: singleEmailOptions.host
+          subject: subject,
+          html: html,
         })
 
-        const response = await fetch('https://smtpmailer.vercel.app/api/smtpmailer', {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json, text/plain, */*',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(singleEmailOptions),
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error(`Failed to send email to ${recipient}:`, {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorText
-          })
+        if (error) {
+          console.error(`Failed to send email to ${recipient}:`, error)
           results.push({ 
             recipient, 
             success: false, 
-            error: errorText,
-            status: response.status,
-            statusText: response.statusText
+            error: error.message || 'Unknown error'
           })
         } else {
-          const result = await response.json()
-          console.log(`Email sent successfully to ${recipient}:`, result)
-          results.push({ recipient, success: true, result })
+          console.log(`Email sent successfully to ${recipient}:`, data?.id)
+          results.push({ recipient, success: true, id: data?.id })
         }
       } catch (error) {
-        console.error(`Error sending email to ${recipient}:`, {
-          error: error instanceof Error ? error.message : 'Unknown error',
-          stack: error instanceof Error ? error.stack : undefined
-        })
+        console.error(`Error sending email to ${recipient}:`, error)
         results.push({ 
           recipient, 
           success: false, 
-          error: error instanceof Error ? error.message : 'Unknown error',
-          errorType: error instanceof Error ? error.constructor.name : typeof error
+          error: error instanceof Error ? error.message : 'Unknown error'
         })
       }
     }
@@ -165,4 +92,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

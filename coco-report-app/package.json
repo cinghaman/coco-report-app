@@ -21,7 +21,8 @@
     "react-dropzone": "^14.3.8",
     "react-window": "^2.2.0",
     "react-window-infinite-loader": "^2.0.0",
-    "recharts": "^3.2.1"
+    "recharts": "^3.2.1",
+    "resend": "^6.5.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

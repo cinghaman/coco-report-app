@@ -1,7 +1,5 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import Script from 'next/script'
-import SMTPLoader from '@/components/SMTPLoader'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -22,12 +20,6 @@ export default function RootLayout({
         <div className="min-h-screen bg-gray-50">
           {children}
         </div>
-        <Script 
-          id="smtp-mailer-script"
-          src="https://smtpmailer.vercel.app/cdn.js"
-          strategy="afterInteractive"
-        />
-        <SMTPLoader />
       </body>
     </html>
   )

@@ -227,51 +227,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
         throw new Error(error.error || 'Failed to delete report')
       }
 
-      const result = await response.json()
-
-      // Send email notification if provided
-      if (result.emailNotification?.shouldSend) {
-        try {
-          const { to, subject, html } = result.emailNotification
-          console.log('Sending deletion email notifications to:', Array.isArray(to) ? to : [to])
-          
-          // Use server-side API to send emails (avoids CORS issues)
-          const emailResponse = await fetch('/api/send-email', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              to: Array.isArray(to) ? to : [to],
-              subject: subject,
-              html: html
-            }),
-          })
-
-          const emailResult = await emailResponse.json()
-          
-          if (emailResponse.ok) {
-            console.log('Deletion email notifications:', emailResult.message)
-            if (emailResult.results) {
-              emailResult.results.forEach((r: any) => {
-                if (r.success) {
-                  console.log(`✓ Deletion email sent to ${r.recipient}`)
-                } else {
-                  console.error(`✗ Failed to send deletion email to ${r.recipient}:`, r.error, r.status || '')
-                }
-              })
-            }
-          } else {
-            console.error('Failed to send deletion email notifications:', emailResult)
-            if (emailResult.config) {
-              console.error('SMTP Config Status:', emailResult.config)
-            }
-          }
-        } catch (emailError) {
-          console.error('Failed to send email notification:', emailError)
-          // Don't fail the deletion if email fails
-        }
-      }
+      // Email notification is now sent server-side in the DELETE endpoint
 
       // Refresh the reports list
       await fetchDashboardData()
