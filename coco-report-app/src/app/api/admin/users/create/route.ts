@@ -96,6 +96,69 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        // Send email notifications
+        try {
+            // 1. Notify admins about new user
+            const { data: adminUsers } = await supabaseAdmin
+                .from('users')
+                .select('email, display_name')
+                .in('role', ['admin', 'owner'])
+
+            const adminEmails = adminUsers?.map(u => u.email).filter(Boolean) || []
+            
+            if (adminEmails.length > 0) {
+                const adminSubject = `New User Created - ${displayName}`
+                const adminHtml = `
+                    <h2>New User Created</h2>
+                    <p><strong>Name:</strong> ${displayName}</p>
+                    <p><strong>Email:</strong> ${email}</p>
+                    <p><strong>Role:</strong> ${role}</p>
+                    <p><strong>Created by:</strong> ${currentUser.email}</p>
+                    <p>The user has been automatically approved and can now log in.</p>
+                `
+
+                await fetch(`${request.nextUrl.origin}/api/send-email`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        to: adminEmails,
+                        subject: adminSubject,
+                        html: adminHtml
+                    })
+                })
+            }
+
+            // 2. Send welcome email to new user with password setup instructions
+            const welcomeSubject = 'Welcome to Coco Reporting System'
+            const welcomeHtml = `
+                <h2>Welcome to Coco Reporting System!</h2>
+                <p>Hello ${displayName},</p>
+                <p>Your account has been created successfully.</p>
+                <p><strong>Your login credentials:</strong></p>
+                <ul>
+                    <li><strong>Email:</strong> ${email}</li>
+                    <li><strong>Password:</strong> ${password}</li>
+                </ul>
+                <p><strong>Important:</strong> Please change your password after your first login for security.</p>
+                <p>You can log in at: <a href="${request.nextUrl.origin}/login">${request.nextUrl.origin}/login</a></p>
+                <p>If you have any questions, please contact your administrator.</p>
+                <p>Best regards,<br>Coco Reporting Team</p>
+            `
+
+            await fetch(`${request.nextUrl.origin}/api/send-email`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    to: email,
+                    subject: welcomeSubject,
+                    html: welcomeHtml
+                })
+            })
+        } catch (emailError) {
+            console.error('Error sending email notifications:', emailError)
+            // Don't fail user creation if email fails
+        }
+
         return NextResponse.json({ user: newUser.user, message: 'User created successfully' })
 
     } catch (error: unknown) {

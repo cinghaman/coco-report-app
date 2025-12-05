@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/auth'
 import { Resend } from 'resend'
 
+/**
+ * Unauthenticated email endpoint for password reset and other public emails
+ * This endpoint doesn't require authentication but should be rate-limited in production
+ */
 export async function POST(request: NextRequest) {
   try {
-    // Verify the request is authenticated
-    const supabase = await createServerSupabaseClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const body = await request.json()
     const { to, subject, html } = body
 
@@ -43,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     for (const recipient of recipients) {
       try {
-        console.log(`Sending email to ${recipient}`)
+        console.log(`Sending unauthenticated email to ${recipient}`)
 
         const { data, error } = await resend.emails.send({
           from: `${fromName} <${fromEmail}>`,
@@ -82,7 +77,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: unknown) {
-    console.error('Error in send-email endpoint:', error)
+    console.error('Error in send-email-unauthenticated endpoint:', error)
     return NextResponse.json(
       {
         error: 'Internal server error',
@@ -92,3 +87,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
