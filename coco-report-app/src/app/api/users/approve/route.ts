@@ -38,6 +38,17 @@ export async function POST(request: NextRequest) {
             )
         }
 
+        // Get user info before updating
+        const { data: userToApprove, error: fetchError } = await supabase
+            .from('users')
+            .select('email, display_name, role')
+            .eq('id', userId)
+            .single()
+
+        if (fetchError) {
+            console.error('Error fetching user to approve:', fetchError)
+        }
+
         // Update user approval status
         const { data: updatedUser, error: updateError } = await supabase
             .from('users')
@@ -56,6 +67,43 @@ export async function POST(request: NextRequest) {
                 { error: 'Failed to update user approval', details: updateError.message },
                 { status: 500 }
             )
+        }
+
+        // Send email notification to user when approved
+        if (approved && userToApprove) {
+            try {
+                // Determine app URL for email links
+                const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : request.nextUrl.origin)
+
+                const emailResponse = await fetch(`${appUrl}/api/send-email-unauthenticated`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        to: userToApprove.email,
+                        subject: 'Account Approved - Coco Reporting System',
+                        html: `
+                            <h2>Account Approved</h2>
+                            <p>Hello ${userToApprove.display_name || userToApprove.email},</p>
+                            <p>Your account has been approved by an administrator.</p>
+                            <p>You can now log in to the Coco Reporting System and start using the platform.</p>
+                            <p><a href="${appUrl}/login" style="background-color: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0;">Log In</a></p>
+                            <p>If you have any questions, please contact your administrator.</p>
+                            <p>Best regards,<br>Coco Reporting Team</p>
+                        `
+                    })
+                })
+
+                if (emailResponse.ok) {
+                    console.log('User approval email sent successfully')
+                } else {
+                    const errorData = await emailResponse.json()
+                    console.error('Failed to send approval email:', errorData)
+                }
+            } catch (emailError) {
+                console.error('Error sending approval email:', emailError)
+                // Don't fail the approval if email fails
+            }
         }
 
         return NextResponse.json({

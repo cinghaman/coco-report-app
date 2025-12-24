@@ -19,6 +19,7 @@ export async function GET() {
     const usersWithAuth = await Promise.all(
       users.map(async (user) => {
         try {
+          if (!supabaseAdmin) return user
           const { data: authData } = await supabaseAdmin.auth.admin.getUserById(user.id)
           return {
             ...user,
@@ -157,6 +158,21 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    // Get user info before deletion for email notification
+    const { data: userToDelete, error: fetchError } = await supabaseAdmin
+      .from('users')
+      .select('email, display_name, role')
+      .eq('id', userId)
+      .single()
+
+    if (fetchError) {
+      console.error('Error fetching user to delete:', fetchError)
+    }
+
+    // Get current admin info from request (if available)
+    // For now, we'll use 'System' as the deleter since this is an admin endpoint
+    const deletedBy = 'Admin'
+
     // Delete user profile first
     const { error: profileError } = await supabaseAdmin
       .from('users')
@@ -169,6 +185,52 @@ export async function DELETE(request: NextRequest) {
     const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId)
 
     if (authError) throw authError
+
+    // Send email notification to admins about user deletion
+    if (userToDelete) {
+      try {
+        // Get all admin emails
+        const { data: adminUsers } = await supabaseAdmin
+          .from('users')
+          .select('email, display_name')
+          .in('role', ['admin', 'owner'])
+
+        const adminEmails = adminUsers?.map(u => u.email).filter(Boolean) || []
+
+        if (adminEmails.length > 0) {
+          // Determine app URL for email links
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
+            (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : request.nextUrl.origin)
+
+          const emailResponse = await fetch(`${appUrl}/api/send-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: adminEmails,
+              subject: `User Deleted - ${userToDelete.display_name || userToDelete.email}`,
+              html: `
+                <h2>User Deleted</h2>
+                <p><strong>Name:</strong> ${userToDelete.display_name || 'N/A'}</p>
+                <p><strong>Email:</strong> ${userToDelete.email}</p>
+                <p><strong>Role:</strong> ${userToDelete.role}</p>
+                <p><strong>Deleted by:</strong> ${deletedBy}</p>
+                <p>The user account and all associated data have been permanently deleted.</p>
+              `
+            })
+          })
+
+          if (emailResponse.ok) {
+            console.log('User deletion email notifications sent successfully')
+          } else {
+            const errorData = await emailResponse.json()
+            console.error('Failed to send deletion email notifications:', errorData)
+          }
+        }
+      } catch (emailError) {
+        console.error('Error sending user deletion email notification:', emailError)
+        // Don't fail the deletion if email fails
+      }
+    }
 
     return NextResponse.json({ success: true })
   } catch (error: unknown) {
