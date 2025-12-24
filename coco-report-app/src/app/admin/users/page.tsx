@@ -15,6 +15,11 @@ interface User {
     approved_by: string | null
 }
 
+interface Venue {
+    id: string
+    name: string
+}
+
 export default function UsersAdminPage() {
     const router = useRouter()
     const [supabase, setSupabase] = useState<ReturnType<typeof createClientComponentClient> | null>(null)
@@ -28,9 +33,11 @@ export default function UsersAdminPage() {
         email: '',
         password: '',
         displayName: '',
-        role: 'staff'
+        role: 'staff',
+        venue_ids: [] as string[]
     })
     const [createLoading, setCreateLoading] = useState(false)
+    const [venues, setVenues] = useState<Venue[]>([])
 
     // Initialize Supabase client only in browser
     useEffect(() => {
@@ -43,8 +50,24 @@ export default function UsersAdminPage() {
         if (supabase) {
             checkAccess()
             fetchUsers()
+            fetchVenues()
         }
     }, [supabase])
+
+    const fetchVenues = async () => {
+        if (!supabase) return
+        try {
+            const { data, error } = await supabase
+                .from('venues')
+                .select('id, name')
+                .order('name')
+            
+            if (error) throw error
+            if (data) setVenues(data)
+        } catch (error) {
+            console.error('Error fetching venues:', error)
+        }
+    }
 
     const checkAccess = async () => {
         if (!supabase) return
@@ -79,6 +102,13 @@ export default function UsersAdminPage() {
 
     const handleCreateUser = async (e: React.FormEvent) => {
         e.preventDefault()
+        
+        // Validate venue selection for staff users
+        if (newUser.role === 'staff' && newUser.venue_ids.length === 0) {
+            alert('Please select at least one venue for staff users')
+            return
+        }
+        
         setCreateLoading(true)
         try {
             const response = await fetch('/api/admin/users/create', {
@@ -90,7 +120,7 @@ export default function UsersAdminPage() {
             if (response.ok) {
                 alert('User created successfully')
                 setShowCreateForm(false)
-                setNewUser({ email: '', password: '', displayName: '', role: 'staff' })
+                setNewUser({ email: '', password: '', displayName: '', role: 'staff', venue_ids: [] })
                 fetchUsers()
             } else {
                 const data = await response.json()
@@ -200,6 +230,40 @@ export default function UsersAdminPage() {
                                     </select>
                                 </div>
                             </div>
+                            
+                            {/* Venue Selection - Show for all roles */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Venue Access {newUser.role === 'staff' && '(Required)'}
+                                </label>
+                                {venues.length === 0 ? (
+                                    <p className="text-sm text-gray-500">Loading venues...</p>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-2 border border-gray-200 rounded-md p-3">
+                                        {venues.map((venue) => (
+                                            <label key={venue.id} className="flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={newUser.venue_ids.includes(venue.id)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setNewUser({ ...newUser, venue_ids: [...newUser.venue_ids, venue.id] })
+                                                        } else {
+                                                            setNewUser({ ...newUser, venue_ids: newUser.venue_ids.filter(id => id !== venue.id) })
+                                                        }
+                                                    }}
+                                                    className="rounded border-gray-300 text-emerald-600 shadow-sm focus:border-emerald-300 focus:ring focus:ring-emerald-200 focus:ring-opacity-50"
+                                                />
+                                                <span className="ml-2 text-sm text-gray-700">{venue.name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                )}
+                                {newUser.role === 'staff' && newUser.venue_ids.length === 0 && (
+                                    <p className="mt-1 text-sm text-red-600">At least one venue must be selected for staff users</p>
+                                )}
+                            </div>
+                            
                             <div className="flex justify-end">
                                 <button
                                     type="submit"

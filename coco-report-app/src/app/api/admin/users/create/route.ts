@@ -32,11 +32,14 @@ export async function POST(request: NextRequest) {
 
         // 2. Parse the request body
         const body = await request.json()
-        const { email, password, displayName, role } = body
+        const { email, password, displayName, role, venue_ids } = body
 
         if (!email || !password || !displayName || !role) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
         }
+
+        // Validate venue_ids is an array if provided
+        const venueIds = Array.isArray(venue_ids) ? venue_ids : (venue_ids ? [venue_ids] : [])
 
         // 3. Create the user using the Service Role Key
         const supabaseAdmin = createClient(
@@ -86,7 +89,7 @@ export async function POST(request: NextRequest) {
                 p_approved: true, // Auto-approve since admin created it
                 p_approved_by: user.id,
                 p_approved_at: new Date().toISOString(),
-                p_venue_ids: []
+                p_venue_ids: venueIds // Use provided venue_ids or empty array
             })
 
             if (profileError) {
