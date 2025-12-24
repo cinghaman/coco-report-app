@@ -34,12 +34,23 @@ export async function POST(request: NextRequest) {
         const body = await request.json()
         const { email, password, displayName, role, venue_ids } = body
 
+        console.log('User creation request received:', {
+            email,
+            displayName,
+            role,
+            venue_ids,
+            venue_ids_type: typeof venue_ids,
+            venue_ids_is_array: Array.isArray(venue_ids)
+        })
+
         if (!email || !password || !displayName || !role) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
         }
 
         // Validate venue_ids is an array if provided
         const venueIds = Array.isArray(venue_ids) ? venue_ids : (venue_ids ? [venue_ids] : [])
+        
+        console.log('Processed venue IDs:', venueIds)
 
         // 3. Create the user using the Service Role Key
         const supabaseAdmin = createClient(
@@ -81,6 +92,14 @@ export async function POST(request: NextRequest) {
             await new Promise(resolve => setTimeout(resolve, 300))
             
             // Use upsert RPC function which handles enum casting properly
+            console.log('Calling upsert_user_profile with:', {
+                p_user_id: newUser.user.id,
+                p_email: email,
+                p_display_name: displayName,
+                p_role: userRole,
+                p_venue_ids: venueIds
+            })
+            
             const { error: profileError } = await supabaseAdmin.rpc('upsert_user_profile', {
                 p_user_id: newUser.user.id,
                 p_email: email,
@@ -99,10 +118,53 @@ export async function POST(request: NextRequest) {
                     details: profileError.message 
                 }, { status: 500 })
             }
+            
+            // Verify the profile was created correctly
+            const { data: createdProfile, error: verifyError } = await supabaseAdmin
+                .from('users')
+                .select('id, email, display_name, role, venue_ids')
+                .eq('id', newUser.user.id)
+                .single()
+            
+            if (verifyError) {
+                console.error('Error verifying user profile:', verifyError)
+            } else {
+                console.log('User profile created successfully:', {
+                    id: createdProfile.id,
+                    email: createdProfile.email,
+                    display_name: createdProfile.display_name,
+                    role: createdProfile.role,
+                    venue_ids: createdProfile.venue_ids,
+                    venue_count: createdProfile.venue_ids?.length || 0
+                })
+                
+                // If display_name or venue_ids are missing, log a warning
+                if (!createdProfile.display_name) {
+                    console.warn('WARNING: display_name is missing in created profile')
+                }
+                if (!createdProfile.venue_ids || createdProfile.venue_ids.length === 0) {
+                    console.warn('WARNING: venue_ids is empty in created profile, expected:', venueIds)
+                }
+            }
+        } else {
+            console.error('newUser.user is null or undefined')
+            return NextResponse.json({ 
+                error: 'User creation failed - no user returned'
+            }, { status: 500 })
         }
+
+        // Return success response IMMEDIATELY (before emails) so user creation succeeds even if emails fail
+        // This prevents 500 errors from email issues
+        const successResponse = NextResponse.json({ 
+            user: newUser.user, 
+            message: 'User created successfully',
+            displayName: displayName,
+            venueIds: venueIds
+        })
 
         // Send email notifications directly via Mailgun (fire-and-forget, non-blocking)
         // Don't await - let it run in background so user creation response isn't delayed
+        // Wrap in Promise.resolve().then() to ensure it doesn't block the response
         Promise.resolve().then(async () => {
             try {
                 const mailgunApiKey = process.env.MAILGUN_API_KEY
@@ -199,11 +261,12 @@ export async function POST(request: NextRequest) {
                 console.error('Error in email notification process:', emailError)
                 // Don't fail user creation if email fails
             }
-        }).catch(err => {
+        }).catch((err: unknown) => {
             console.error('Unhandled error in email notification:', err)
         })
 
-        return NextResponse.json({ user: newUser.user, message: 'User created successfully' })
+        // Return success response immediately (emails will be sent in background)
+        return successResponse
 
     } catch (error: unknown) {
         console.error('Error in create user endpoint:', error)
