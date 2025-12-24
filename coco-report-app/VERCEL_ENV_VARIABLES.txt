@@ -1,0 +1,39 @@
+# ============================================
+# Vercel Environment Variables
+# ============================================
+# Copy and paste these into Vercel Dashboard
+# Settings > Environment Variables > Add New
+#
+# For each variable:
+# 1. Name: (variable name from below)
+# 2. Value: (value from below)
+# 3. Environment: Select Production, Preview, Development
+# 4. Click Save
+# ============================================
+
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=https://wnwzifhngkynpxknovii.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_mRwlPF-Tud5YVPObKmVhWw_wV_4H5QB
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+
+# Mailgun Email Configuration
+MAILGUN_API_KEY=your_mailgun_api_key_here
+MAILGUN_DOMAIN=coco-notifications.info
+MAILGUN_API_URL=https://api.eu.mailgun.net
+MAILGUN_FROM_EMAIL=postmaster@coco-notifications.info
+MAILGUN_FROM_NAME=Coco Reporting
+
+# ============================================
+# IMPORTANT NOTES:
+# ============================================
+# 1. Replace SUPABASE_SERVICE_ROLE_KEY with your actual key from:
+#    Supabase Dashboard > Settings > API > service_role key
+#
+# 2. All Mailgun variables are already set correctly
+#
+# 3. After adding variables, REDEPLOY your application
+#
+# 4. Select all three environments (Production, Preview, Development)
+#    when adding each variable
+# ============================================
+

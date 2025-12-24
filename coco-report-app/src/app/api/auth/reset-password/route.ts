@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { Resend } from 'resend'
+import Mailgun from 'mailgun.js'
+import FormData from 'form-data'
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,20 +42,29 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Send custom email using Resend with the reset link
-    const resendApiKey = process.env.RESEND_API_KEY
+    // Send custom email using Mailgun with the reset link
+    const mailgunApiKey = process.env.MAILGUN_API_KEY
 
-    if (!resendApiKey) {
-      console.error('Resend API key not configured')
+    if (!mailgunApiKey) {
+      console.error('Mailgun API key not configured')
       // Still return success to prevent email enumeration
       return NextResponse.json({ 
         message: 'If an account exists with this email, a password reset link has been sent.'
       })
     }
 
-    const resend = new Resend(resendApiKey)
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'
-    const fromName = process.env.RESEND_FROM_NAME || 'Coco Reporting'
+    // Get Mailgun domain from environment or use default
+    const mailgunDomain = process.env.MAILGUN_DOMAIN || 'coco-notifications.info'
+    const fromEmail = process.env.MAILGUN_FROM_EMAIL || `postmaster@${mailgunDomain}`
+    const fromName = process.env.MAILGUN_FROM_NAME || 'Coco Reporting'
+
+    // Initialize Mailgun
+    const mailgun = new Mailgun(FormData)
+    const mg = mailgun.client({
+      username: 'api',
+      key: mailgunApiKey,
+      url: process.env.MAILGUN_API_URL || 'https://api.eu.mailgun.net'
+    })
 
     const resetLink = resetData.properties?.action_link || `${request.nextUrl.origin}/auth/reset-password?token=${resetData.properties?.hashed_token}`
     
@@ -72,23 +82,15 @@ export async function POST(request: NextRequest) {
     `
 
     try {
-      const { data, error: emailError } = await resend.emails.send({
+      const data = await mg.messages.create(mailgunDomain, {
         from: `${fromName} <${fromEmail}>`,
         to: email,
         subject: resetSubject,
         html: resetHtml,
       })
 
-      if (emailError) {
-        console.error('Error sending reset email:', emailError)
-        // Still return success to prevent email enumeration
-        return NextResponse.json({ 
-          message: 'If an account exists with this email, a password reset link has been sent.'
-        })
-      }
-
-      console.log('Password reset email sent successfully:', data?.id)
-    } catch (emailError) {
+      console.log('Password reset email sent successfully:', data.id)
+    } catch (emailError: any) {
       console.error('Error sending reset email:', emailError)
       // Still return success to prevent email enumeration
     }

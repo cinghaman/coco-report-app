@@ -46,17 +46,19 @@ npm install
 cp .env.example .env.local
 ```
 
-Update `.env.local` with your Supabase and Resend credentials:
+Update `.env.local` with your Supabase and Mailgun credentials:
 ```env
 # Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
-# Resend Email Configuration (Required for email notifications)
-RESEND_API_KEY=re_your_resend_api_key_here
-RESEND_FROM_EMAIL=your-verified-email@yourdomain.com
-RESEND_FROM_NAME=Coco Reporting
+# Mailgun Email Configuration (Required for email notifications)
+MAILGUN_API_KEY=your_mailgun_api_key_here
+MAILGUN_DOMAIN=coco-notifications.info
+MAILGUN_API_URL=https://api.eu.mailgun.net
+MAILGUN_FROM_EMAIL=postmaster@coco-notifications.info
+MAILGUN_FROM_NAME=Coco Reporting
 ```
 
 **Note:** For Vercel deployment, add these environment variables in your Vercel project settings under Settings → Environment Variables.

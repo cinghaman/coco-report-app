@@ -20,29 +20,42 @@ vercel link
 
 ### 4. Add Environment Variables via CLI
 
-#### Add Resend API Key
+#### Add Mailgun API Key (Required)
 ```bash
-vercel env add RESEND_API_KEY production
-# When prompted, paste your Resend API key
+vercel env add MAILGUN_API_KEY production
+# When prompted, paste your Mailgun API key
 ```
 
-#### Add Resend From Email (optional)
+#### Add Mailgun Domain (optional, defaults to coco-notifications.info)
 ```bash
-vercel env add RESEND_FROM_EMAIL production
-# When prompted, enter: your-verified-email@yourdomain.com
+vercel env add MAILGUN_DOMAIN production
+# When prompted, enter: coco-notifications.info
 ```
 
-#### Add Resend From Name (optional)
+#### Add Mailgun API URL (optional, defaults to https://api.eu.mailgun.net)
 ```bash
-vercel env add RESEND_FROM_NAME production
+vercel env add MAILGUN_API_URL production
+# When prompted, enter: https://api.eu.mailgun.net
+```
+
+#### Add Mailgun From Email (optional, defaults to postmaster@coco-notifications.info)
+```bash
+vercel env add MAILGUN_FROM_EMAIL production
+# When prompted, enter: postmaster@coco-notifications.info
+```
+
+#### Add Mailgun From Name (optional, defaults to Coco Reporting)
+```bash
+vercel env add MAILGUN_FROM_NAME production
 # When prompted, enter: Coco Reporting
 ```
 
 #### Add for all environments (Production, Preview, Development)
 For each variable, run:
 ```bash
-vercel env add RESEND_API_KEY preview
-vercel env add RESEND_API_KEY development
+vercel env add MAILGUN_API_KEY preview
+vercel env add MAILGUN_API_KEY development
+# Repeat for other variables as needed
 ```
 
 ### 5. Verify Environment Variables
@@ -58,11 +71,13 @@ vercel env pull .env.local
 ## Required Environment Variables
 
 ### Required:
-- `RESEND_API_KEY` - Your Resend API key (get from https://resend.com/api-keys)
+- `MAILGUN_API_KEY` - Your Mailgun API key (get from https://app.mailgun.com/app/api-keys)
 
 ### Optional (with defaults):
-- `RESEND_FROM_EMAIL` - Defaults to `onboarding@resend.dev`
-- `RESEND_FROM_NAME` - Defaults to `Coco Reporting`
+- `MAILGUN_DOMAIN` - Defaults to `coco-notifications.info`
+- `MAILGUN_API_URL` - Defaults to `https://api.eu.mailgun.net` (EU endpoint)
+- `MAILGUN_FROM_EMAIL` - Defaults to `postmaster@coco-notifications.info`
+- `MAILGUN_FROM_NAME` - Defaults to `Coco Reporting`
 
 ### Supabase (if not already set):
 - `NEXT_PUBLIC_SUPABASE_URL`
@@ -76,13 +91,13 @@ vercel env pull .env.local
 3. **Never commit** `.env.local` or environment variables to git
 4. Use **Production, Preview, and Development** environments as needed
 
-## Getting Your Resend API Key
+## Getting Your Mailgun API Key
 
-1. Go to https://resend.com/api-keys
-2. Click "Create API Key"
-3. Give it a name (e.g., "Coco Reporting Production")
-4. Copy the key (starts with `re_`)
-5. **Important**: If your old key was exposed, delete it and create a new one
+1. Go to https://app.mailgun.com/app/api-keys
+2. Find your Private API key (or create a new one)
+3. Copy the key (format: `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxx-xxxx`)
+4. **Important**: Keep your API key secure and never commit it to git
+5. **Note**: For EU domains, make sure you're using the EU API endpoint (`https://api.eu.mailgun.net`)
 
 ## Troubleshooting
 
