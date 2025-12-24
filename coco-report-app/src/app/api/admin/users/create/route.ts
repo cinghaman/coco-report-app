@@ -98,13 +98,17 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Send email notifications directly via Mailgun
-        try {
-            const mailgunApiKey = process.env.MAILGUN_API_KEY
-            
-            if (!mailgunApiKey) {
-                console.warn('Mailgun API key not configured, skipping email notifications')
-            } else {
+        // Send email notifications directly via Mailgun (fire-and-forget, non-blocking)
+        // Don't await - let it run in background so user creation response isn't delayed
+        Promise.resolve().then(async () => {
+            try {
+                const mailgunApiKey = process.env.MAILGUN_API_KEY
+                
+                if (!mailgunApiKey) {
+                    console.warn('Mailgun API key not configured, skipping email notifications')
+                    return
+                }
+
                 const mailgunDomain = process.env.MAILGUN_DOMAIN || 'coco-notifications.info'
                 const fromEmail = process.env.MAILGUN_FROM_EMAIL || `postmaster@${mailgunDomain}`
                 const fromName = process.env.MAILGUN_FROM_NAME || 'Coco Reporting'
@@ -117,15 +121,15 @@ export async function POST(request: NextRequest) {
                 })
 
                 // 1. Notify admins about new user
-                const { data: adminUsers } = await supabaseAdmin
-                    .from('users')
-                    .select('email, display_name')
-                    .in('role', ['admin', 'owner'])
+                try {
+                    const { data: adminUsers } = await supabaseAdmin
+                        .from('users')
+                        .select('email, display_name')
+                        .in('role', ['admin', 'owner'])
 
-                const adminEmails = adminUsers?.map(u => u.email).filter(Boolean) || []
-                
-                if (adminEmails.length > 0) {
-                    try {
+                    const adminEmails = adminUsers?.map(u => u.email).filter(Boolean) || []
+                    
+                    if (adminEmails.length > 0) {
                         const adminSubject = `New User Created - ${displayName}`
                         const adminHtml = `
                             <h2>New User Created</h2>
@@ -144,9 +148,9 @@ export async function POST(request: NextRequest) {
                         })
 
                         console.log('Admin notification email sent successfully:', adminData.id)
-                    } catch (adminEmailError) {
-                        console.error('Error sending admin notification email:', adminEmailError)
                     }
+                } catch (adminEmailError) {
+                    console.error('Error sending admin notification email:', adminEmailError)
                 }
 
                 // 2. Send welcome email to new user with password setup instructions
@@ -178,11 +182,13 @@ export async function POST(request: NextRequest) {
                 } catch (welcomeEmailError) {
                     console.error('Error sending welcome email:', welcomeEmailError)
                 }
+            } catch (emailError) {
+                console.error('Error in email notification process:', emailError)
+                // Don't fail user creation if email fails
             }
-        } catch (emailError) {
-            console.error('Error sending email notifications:', emailError)
-            // Don't fail user creation if email fails
-        }
+        }).catch(err => {
+            console.error('Unhandled error in email notification:', err)
+        })
 
         return NextResponse.json({ user: newUser.user, message: 'User created successfully' })
 
