@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import Mailgun from 'mailgun.js'
+import FormData from 'form-data'
 
 export async function GET() {
   try {
@@ -181,12 +183,16 @@ export async function DELETE(request: NextRequest) {
 
     if (profileError) throw profileError
 
-    // Delete auth user
+    // Delete auth user (handle case where user might already be deleted)
     const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId)
+    
+    // If auth user doesn't exist, that's okay - profile is already deleted
+    if (authError && authError.message !== 'User not found') {
+      console.warn('Error deleting auth user (may already be deleted):', authError)
+      // Don't throw - profile is already deleted, which is the main goal
+    }
 
-    if (authError) throw authError
-
-    // Send email notification to admins about user deletion
+    // Send email notification to admins about user deletion using Mailgun directly
     if (userToDelete) {
       try {
         // Get all admin emails
@@ -198,32 +204,43 @@ export async function DELETE(request: NextRequest) {
         const adminEmails = adminUsers?.map(u => u.email).filter(Boolean) || []
 
         if (adminEmails.length > 0) {
-          // Determine app URL for email links
-          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
-            (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : request.nextUrl.origin)
+          // Send email directly via Mailgun (no authentication required)
+          const mailgunApiKey = process.env.MAILGUN_API_KEY
+          
+          if (mailgunApiKey) {
+            const mailgunDomain = process.env.MAILGUN_DOMAIN || 'coco-notifications.info'
+            const fromEmail = process.env.MAILGUN_FROM_EMAIL || `postmaster@${mailgunDomain}`
+            const fromName = process.env.MAILGUN_FROM_NAME || 'Coco Reporting'
 
-          const emailResponse = await fetch(`${appUrl}/api/send-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              to: adminEmails,
-              subject: `User Deleted - ${userToDelete.display_name || userToDelete.email}`,
-              html: `
-                <h2>User Deleted</h2>
-                <p><strong>Name:</strong> ${userToDelete.display_name || 'N/A'}</p>
-                <p><strong>Email:</strong> ${userToDelete.email}</p>
-                <p><strong>Role:</strong> ${userToDelete.role}</p>
-                <p><strong>Deleted by:</strong> ${deletedBy}</p>
-                <p>The user account and all associated data have been permanently deleted.</p>
-              `
+            const mailgun = new Mailgun(FormData)
+            const mg = mailgun.client({
+              username: 'api',
+              key: mailgunApiKey,
+              url: process.env.MAILGUN_API_URL || 'https://api.eu.mailgun.net'
             })
-          })
 
-          if (emailResponse.ok) {
-            console.log('User deletion email notifications sent successfully')
+            try {
+              const data = await mg.messages.create(mailgunDomain, {
+                from: `${fromName} <${fromEmail}>`,
+                to: adminEmails,
+                subject: `User Deleted - ${userToDelete.display_name || userToDelete.email}`,
+                html: `
+                  <h2>User Deleted</h2>
+                  <p><strong>Name:</strong> ${userToDelete.display_name || 'N/A'}</p>
+                  <p><strong>Email:</strong> ${userToDelete.email}</p>
+                  <p><strong>Role:</strong> ${userToDelete.role}</p>
+                  <p><strong>Deleted by:</strong> ${deletedBy}</p>
+                  <p>The user account and all associated data have been permanently deleted.</p>
+                `
+              })
+
+              console.log('User deletion email notifications sent successfully:', data.id)
+            } catch (emailError: any) {
+              console.error('Error sending user deletion email notification:', emailError)
+              // Don't fail the deletion if email fails
+            }
           } else {
-            const errorData = await emailResponse.json()
-            console.error('Failed to send deletion email notifications:', errorData)
+            console.warn('Mailgun API key not configured, skipping email notification')
           }
         }
       } catch (emailError) {
