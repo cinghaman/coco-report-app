@@ -94,8 +94,27 @@ export async function POST(request: NextRequest) {
       url: process.env.MAILGUN_API_URL || 'https://api.eu.mailgun.net'
     })
 
-    // Use the same app URL for the reset link
-    const resetLink = resetData.properties?.action_link || `${appUrl}/auth/reset-password?token=${resetData.properties?.hashed_token}`
+    // Construct the reset link manually using our app URL
+    // Supabase's action_link may contain localhost from Site URL config, so we build our own
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const token = resetData.properties?.hashed_token
+    
+    if (!token) {
+      console.error('No token received from Supabase generateLink')
+      return NextResponse.json({ 
+        message: 'If an account exists with this email, a password reset link has been sent.'
+      })
+    }
+    
+    // Use Supabase's verify endpoint but with our production redirect URL
+    // This ensures the link works correctly and redirects to our app
+    const resetLink = `${supabaseUrl}/auth/v1/verify?token=${token}&type=recovery&redirect_to=${encodeURIComponent(`${appUrl}/auth/reset-password`)}`
+    
+    console.log('Reset link constructed:', {
+      token: token.substring(0, 10) + '...',
+      appUrl,
+      resetLink: resetLink.substring(0, 100) + '...'
+    })
     
     const resetSubject = 'Password Reset Request - Coco Reporting System'
     const resetHtml = `
