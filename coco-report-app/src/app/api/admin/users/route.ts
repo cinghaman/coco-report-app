@@ -176,10 +176,10 @@ export async function DELETE(request: NextRequest) {
     const deletedBy = 'Admin'
 
     // BEFORE deleting the user, transfer all their reports to an admin
-    // Find all reports created by this user
+    // Find all reports created by this user (only those still owned by this user)
     const { data: userReports, error: reportsFetchError } = await supabaseAdmin
       .from('daily_reports')
-      .select('id, for_date, venue_id')
+      .select('id, for_date, venue_id, created_by')
       .eq('created_by', userId)
 
     if (reportsFetchError) {
@@ -188,28 +188,44 @@ export async function DELETE(request: NextRequest) {
 
     let reportsTransferred = 0
     if (userReports && userReports.length > 0) {
-      // Find an admin user to transfer reports to (prefer owner, then admin)
+      // Find a SINGLE admin user to transfer ALL reports to (prefer owner, then admin)
+      // This ensures all reports go to ONE admin, preventing duplication
       const { data: adminUsers, error: adminFetchError } = await supabaseAdmin
         .from('users')
         .select('id, email, role')
         .in('role', ['owner', 'admin'])
+        .neq('id', userId) // Exclude the user being deleted
         .order('role', { ascending: true }) // owner first, then admin
-        .limit(1)
+        .limit(1) // Only get ONE admin to ensure no duplication
 
       if (adminFetchError || !adminUsers || adminUsers.length === 0) {
         console.error('Error finding admin user for report transfer:', adminFetchError)
         // If no admin found, we can't transfer - this is a critical error
-        // But we'll still try to delete the user and log the issue
-        console.warn(`WARNING: Cannot transfer ${userReports.length} reports - no admin user found`)
-      } else {
-        const transferToAdminId = adminUsers[0].id
-        const transferToAdminEmail = adminUsers[0].email
+        return NextResponse.json(
+          { 
+            error: 'Cannot delete user: No admin user available to transfer reports to',
+            details: `User has ${userReports.length} report(s) that need to be transferred`
+          },
+          { status: 400 }
+        )
+      }
 
-        // Transfer all reports to the admin
-        const { error: transferError } = await supabaseAdmin
+      const transferToAdminId = adminUsers[0].id
+      const transferToAdminEmail = adminUsers[0].email
+
+      // Verify reports are still owned by this user before transfer (safety check)
+      const reportsToTransfer = userReports.filter(r => r.created_by === userId)
+      
+      if (reportsToTransfer.length === 0) {
+        console.log('No reports to transfer (may have been already transferred)')
+      } else {
+        // Transfer ALL reports to the SINGLE admin in one atomic operation
+        // This prevents duplication - all reports go to one admin
+        const { data: transferResult, error: transferError } = await supabaseAdmin
           .from('daily_reports')
           .update({ created_by: transferToAdminId })
           .eq('created_by', userId)
+          .select('id')
 
         if (transferError) {
           console.error('Error transferring reports to admin:', transferError)
@@ -223,8 +239,8 @@ export async function DELETE(request: NextRequest) {
           )
         }
 
-        reportsTransferred = userReports.length
-        console.log(`Successfully transferred ${reportsTransferred} reports from user ${userId} to admin ${transferToAdminEmail}`)
+        reportsTransferred = transferResult?.length || reportsToTransfer.length
+        console.log(`Successfully transferred ${reportsTransferred} reports from user ${userId} to admin ${transferToAdminEmail} (single admin, no duplication)`)
       }
     }
 
