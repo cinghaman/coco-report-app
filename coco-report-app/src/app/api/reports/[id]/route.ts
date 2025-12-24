@@ -6,7 +6,7 @@ import FormData from 'form-data'
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
     // 1. Verify the current user is an admin
@@ -33,8 +33,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 })
     }
 
-    // 2. Get the report ID from params
-    const reportId = params.id
+    // 2. Get the report ID from params (handle both Promise and direct params for Next.js 16 compatibility)
+    const resolvedParams = params instanceof Promise ? await params : params
+    const reportId = resolvedParams.id
 
     if (!reportId) {
       return NextResponse.json({ error: 'Report ID is required' }, { status: 400 })
