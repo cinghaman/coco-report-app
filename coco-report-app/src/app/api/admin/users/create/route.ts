@@ -69,7 +69,9 @@ export async function POST(request: NextRequest) {
             password,
             email_confirm: true, // Auto-confirm email
             user_metadata: {
-                display_name: displayName,
+                full_name: displayName, // Trigger looks for 'full_name' in metadata
+                name: displayName, // Fallback for trigger
+                display_name: displayName, // Also set display_name for consistency
                 role: role
             }
         })
@@ -89,18 +91,21 @@ export async function POST(request: NextRequest) {
             const userRole = validRoles.includes(role) ? role : 'staff'
             
             // Wait a moment for trigger to complete (if it hasn't already)
-            await new Promise(resolve => setTimeout(resolve, 300))
+            // The trigger creates a basic profile, then we update it with correct values
+            await new Promise(resolve => setTimeout(resolve, 500)) // Increased wait time
             
             // Use upsert RPC function which handles enum casting properly
+            // This will update the profile created by the trigger with correct display_name and venue_ids
             console.log('Calling upsert_user_profile with:', {
                 p_user_id: newUser.user.id,
                 p_email: email,
                 p_display_name: displayName,
                 p_role: userRole,
-                p_venue_ids: venueIds
+                p_venue_ids: venueIds,
+                venue_ids_count: venueIds.length
             })
             
-            const { error: profileError } = await supabaseAdmin.rpc('upsert_user_profile', {
+            const { data: rpcResult, error: profileError } = await supabaseAdmin.rpc('upsert_user_profile', {
                 p_user_id: newUser.user.id,
                 p_email: email,
                 p_display_name: displayName,
@@ -110,6 +115,8 @@ export async function POST(request: NextRequest) {
                 p_approved_at: new Date().toISOString(),
                 p_venue_ids: venueIds // Use provided venue_ids or empty array
             })
+            
+            console.log('RPC upsert_user_profile result:', { rpcResult, profileError: profileError?.message })
 
             if (profileError) {
                 console.error('Error upserting user profile:', profileError)
