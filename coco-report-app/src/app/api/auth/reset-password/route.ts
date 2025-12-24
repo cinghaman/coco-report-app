@@ -25,14 +25,32 @@ export async function POST(request: NextRequest) {
     )
 
     // Determine the correct app URL for redirect
-    // Priority: NEXT_PUBLIC_APP_URL > VERCEL_URL > request origin
+    // Priority: NEXT_PUBLIC_APP_URL > VERCEL_URL > request headers > request origin
     let appUrl = request.nextUrl.origin
+    
+    // Check environment variable first (most reliable)
     if (process.env.NEXT_PUBLIC_APP_URL) {
       appUrl = process.env.NEXT_PUBLIC_APP_URL
     } else if (process.env.VERCEL_URL) {
       // VERCEL_URL is provided by Vercel automatically (e.g., "coco-report-app.vercel.app")
       appUrl = `https://${process.env.VERCEL_URL}`
+    } else {
+      // Check request headers for the actual host (works in Vercel)
+      const host = request.headers.get('x-forwarded-host') || request.headers.get('host')
+      const protocol = request.headers.get('x-forwarded-proto') || 'https'
+      
+      if (host && !host.includes('localhost')) {
+        appUrl = `${protocol}://${host}`
+      }
     }
+    
+    // Log for debugging (remove in production if needed)
+    console.log('Password reset URL detection:', {
+      NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'not set',
+      VERCEL_URL: process.env.VERCEL_URL || 'not set',
+      requestOrigin: request.nextUrl.origin,
+      finalAppUrl: appUrl
+    })
     
     // Generate password reset token using Supabase Admin API
     const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({
