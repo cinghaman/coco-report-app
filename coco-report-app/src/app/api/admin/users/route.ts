@@ -175,6 +175,59 @@ export async function DELETE(request: NextRequest) {
     // For now, we'll use 'System' as the deleter since this is an admin endpoint
     const deletedBy = 'Admin'
 
+    // BEFORE deleting the user, transfer all their reports to an admin
+    // Find all reports created by this user
+    const { data: userReports, error: reportsFetchError } = await supabaseAdmin
+      .from('daily_reports')
+      .select('id, for_date, venue_id')
+      .eq('created_by', userId)
+
+    if (reportsFetchError) {
+      console.error('Error fetching user reports:', reportsFetchError)
+    }
+
+    let reportsTransferred = 0
+    if (userReports && userReports.length > 0) {
+      // Find an admin user to transfer reports to (prefer owner, then admin)
+      const { data: adminUsers, error: adminFetchError } = await supabaseAdmin
+        .from('users')
+        .select('id, email, role')
+        .in('role', ['owner', 'admin'])
+        .order('role', { ascending: true }) // owner first, then admin
+        .limit(1)
+
+      if (adminFetchError || !adminUsers || adminUsers.length === 0) {
+        console.error('Error finding admin user for report transfer:', adminFetchError)
+        // If no admin found, we can't transfer - this is a critical error
+        // But we'll still try to delete the user and log the issue
+        console.warn(`WARNING: Cannot transfer ${userReports.length} reports - no admin user found`)
+      } else {
+        const transferToAdminId = adminUsers[0].id
+        const transferToAdminEmail = adminUsers[0].email
+
+        // Transfer all reports to the admin
+        const { error: transferError } = await supabaseAdmin
+          .from('daily_reports')
+          .update({ created_by: transferToAdminId })
+          .eq('created_by', userId)
+
+        if (transferError) {
+          console.error('Error transferring reports to admin:', transferError)
+          // This is critical - we shouldn't delete the user if we can't transfer reports
+          return NextResponse.json(
+            { 
+              error: 'Failed to transfer user reports before deletion',
+              details: transferError.message 
+            },
+            { status: 500 }
+          )
+        }
+
+        reportsTransferred = userReports.length
+        console.log(`Successfully transferred ${reportsTransferred} reports from user ${userId} to admin ${transferToAdminEmail}`)
+      }
+    }
+
     // Delete user profile first
     const { error: profileError } = await supabaseAdmin
       .from('users')
@@ -220,6 +273,10 @@ export async function DELETE(request: NextRequest) {
             })
 
             try {
+              const reportsInfo = reportsTransferred > 0 
+                ? `<p><strong>Reports Transferred:</strong> ${reportsTransferred} report(s) created by this user have been transferred to an admin account to preserve data.</p>`
+                : '<p>No reports were associated with this user.</p>'
+
               const data = await mg.messages.create(mailgunDomain, {
                 from: `${fromName} <${fromEmail}>`,
                 to: adminEmails,
@@ -230,6 +287,7 @@ export async function DELETE(request: NextRequest) {
                   <p><strong>Email:</strong> ${userToDelete.email}</p>
                   <p><strong>Role:</strong> ${userToDelete.role}</p>
                   <p><strong>Deleted by:</strong> ${deletedBy}</p>
+                  ${reportsInfo}
                   <p>The user account and all associated data have been permanently deleted.</p>
                 `
               })
@@ -249,7 +307,10 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ 
+      success: true,
+      reportsTransferred: reportsTransferred
+    })
   } catch (error: unknown) {
     console.error('Error deleting user:', error)
     return NextResponse.json(
