@@ -571,7 +571,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
           // Fetch all admin emails
           const { data: adminUsers, error: adminError } = await supabase
             .from('users')
-            .select('email, display_name')
+            .select('email, display_name, role')
             .in('role', ['admin', 'owner'])
 
           if (adminError) {
@@ -580,10 +580,20 @@ export default function EODForm({ user, initialData }: EODFormProps) {
 
           const adminEmails = adminUsers?.map(u => u.email).filter(Boolean) || []
           
-          // Fallback to default email if no admins found
-          const recipientEmails = adminEmails.length > 0 
-            ? adminEmails 
-            : ['shetty.aneet@gmail.com']
+          // Always include these admin emails as fallback/ensure they're included
+          const requiredAdminEmails = ['admin@thoughtbulb.dev', 'shetty.aneet@gmail.com']
+          const allAdminEmails = [...new Set([...adminEmails, ...requiredAdminEmails])] // Remove duplicates
+          
+          console.log('Report creation notification - Admin emails fetched:', {
+            fromDatabase: adminEmails,
+            totalRecipients: allAdminEmails,
+            adminUsersFound: adminUsers?.length || 0,
+            error: adminError?.message
+          })
+
+          const recipientEmails = allAdminEmails.length > 0 
+            ? allAdminEmails 
+            : requiredAdminEmails // Final fallback
 
           console.log('Preparing to send email notifications to:', recipientEmails)
 

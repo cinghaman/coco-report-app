@@ -48,6 +48,13 @@ export async function POST(request: NextRequest) {
     const recipients = Array.isArray(to) ? to : [to]
     const results = []
 
+    console.log('Email notification request:', {
+      subject,
+      recipients: recipients,
+      recipientCount: recipients.length,
+      authenticatedUser: user.email
+    })
+
     for (const recipient of recipients) {
       try {
         console.log(`Sending email to ${recipient}`)

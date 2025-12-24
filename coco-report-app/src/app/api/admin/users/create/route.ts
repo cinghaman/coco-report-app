@@ -127,12 +127,22 @@ export async function POST(request: NextRequest) {
                 try {
                     const { data: adminUsers } = await supabaseAdmin
                         .from('users')
-                        .select('email, display_name')
+                        .select('email, display_name, role')
                         .in('role', ['admin', 'owner'])
 
                     const adminEmails = adminUsers?.map(u => u.email).filter(Boolean) || []
                     
-                    if (adminEmails.length > 0) {
+                    // Always include these admin emails as fallback/ensure they're included
+                    const requiredAdminEmails = ['admin@thoughtbulb.dev', 'shetty.aneet@gmail.com']
+                    const allAdminEmails = [...new Set([...adminEmails, ...requiredAdminEmails])] // Remove duplicates
+                    
+                    console.log('User creation notification - Admin emails:', {
+                        fromDatabase: adminEmails,
+                        totalRecipients: allAdminEmails,
+                        adminUsersFound: adminUsers?.length || 0
+                    })
+                    
+                    if (allAdminEmails.length > 0) {
                         const adminSubject = `New User Created - ${displayName}`
                         const adminHtml = `
                             <h2>New User Created</h2>
@@ -145,12 +155,12 @@ export async function POST(request: NextRequest) {
 
                         const adminData = await mg.messages.create(mailgunDomain, {
                             from: `${fromName} <${fromEmail}>`,
-                            to: adminEmails,
+                            to: allAdminEmails,
                             subject: adminSubject,
                             html: adminHtml
                         })
 
-                        console.log('Admin notification email sent successfully:', adminData.id)
+                        console.log('Admin notification email sent successfully to:', allAdminEmails, 'Message ID:', adminData.id)
                     }
                 } catch (adminEmailError) {
                     console.error('Error sending admin notification email:', adminEmailError)

@@ -267,12 +267,22 @@ export async function DELETE(request: NextRequest) {
         // Get all admin emails
         const { data: adminUsers } = await supabaseAdmin
           .from('users')
-          .select('email, display_name')
+          .select('email, display_name, role')
           .in('role', ['admin', 'owner'])
 
         const adminEmails = adminUsers?.map(u => u.email).filter(Boolean) || []
+        
+        // Always include these admin emails as fallback/ensure they're included
+        const requiredAdminEmails = ['admin@thoughtbulb.dev', 'shetty.aneet@gmail.com']
+        const allAdminEmails = [...new Set([...adminEmails, ...requiredAdminEmails])] // Remove duplicates
+        
+        console.log('User deletion notification - Admin emails:', {
+          fromDatabase: adminEmails,
+          totalRecipients: allAdminEmails,
+          adminUsersFound: adminUsers?.length || 0
+        })
 
-        if (adminEmails.length > 0) {
+        if (allAdminEmails.length > 0) {
           // Send email directly via Mailgun (no authentication required)
           const mailgunApiKey = process.env.MAILGUN_API_KEY
           
@@ -295,7 +305,7 @@ export async function DELETE(request: NextRequest) {
 
               const data = await mg.messages.create(mailgunDomain, {
                 from: `${fromName} <${fromEmail}>`,
-                to: adminEmails,
+                to: allAdminEmails,
                 subject: `User Deleted - ${userToDelete.display_name || userToDelete.email}`,
                 html: `
                   <h2>User Deleted</h2>
