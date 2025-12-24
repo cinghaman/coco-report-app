@@ -92,38 +92,77 @@ export async function POST(request: NextRequest) {
             
             // Wait a moment for trigger to complete (if it hasn't already)
             // The trigger creates a basic profile, then we update it with correct values
-            await new Promise(resolve => setTimeout(resolve, 500)) // Increased wait time
+            await new Promise(resolve => setTimeout(resolve, 500))
             
-            // Use upsert RPC function which handles enum casting properly
-            // This will update the profile created by the trigger with correct display_name and venue_ids
-            console.log('Calling upsert_user_profile with:', {
-                p_user_id: newUser.user.id,
-                p_email: email,
-                p_display_name: displayName,
-                p_role: userRole,
-                p_venue_ids: venueIds,
-                venue_ids_count: venueIds.length
-            })
+            // Check if profile already exists (created by trigger)
+            const { data: existingProfile } = await supabaseAdmin
+                .from('users')
+                .select('id')
+                .eq('id', newUser.user.id)
+                .single()
             
-            const { data: rpcResult, error: profileError } = await supabaseAdmin.rpc('upsert_user_profile', {
-                p_user_id: newUser.user.id,
-                p_email: email,
-                p_display_name: displayName,
-                p_role: userRole,
-                p_approved: true, // Auto-approve since admin created it
-                p_approved_by: user.id,
-                p_approved_at: new Date().toISOString(),
-                p_venue_ids: venueIds // Use provided venue_ids or empty array
-            })
-            
-            console.log('RPC upsert_user_profile result:', { rpcResult, profileError: profileError?.message })
+            if (existingProfile) {
+                // Profile exists (created by trigger), just UPDATE it
+                console.log('Profile exists, updating with:', {
+                    display_name: displayName,
+                    role: userRole,
+                    venue_ids: venueIds,
+                    venue_ids_count: venueIds.length
+                })
+                
+                const { error: updateError } = await supabaseAdmin
+                    .from('users')
+                    .update({
+                        email: email,
+                        display_name: displayName,
+                        role: userRole as any, // Cast to enum type
+                        approved: true,
+                        approved_by: user.id,
+                        approved_at: new Date().toISOString(),
+                        venue_ids: venueIds
+                    })
+                    .eq('id', newUser.user.id)
+                
+                if (updateError) {
+                    console.error('Error updating user profile:', updateError)
+                    return NextResponse.json({ 
+                        error: 'Database error updating user profile',
+                        details: updateError.message 
+                    }, { status: 500 })
+                }
+                
+                console.log('User profile updated successfully')
+            } else {
+                // Profile doesn't exist yet, use RPC function to create it
+                console.log('Profile does not exist, creating with RPC:', {
+                    p_user_id: newUser.user.id,
+                    p_email: email,
+                    p_display_name: displayName,
+                    p_role: userRole,
+                    p_venue_ids: venueIds,
+                    venue_ids_count: venueIds.length
+                })
+                
+                const { data: rpcResult, error: profileError } = await supabaseAdmin.rpc('upsert_user_profile', {
+                    p_user_id: newUser.user.id,
+                    p_email: email,
+                    p_display_name: displayName,
+                    p_role: userRole,
+                    p_approved: true,
+                    p_approved_by: user.id,
+                    p_approved_at: new Date().toISOString(),
+                    p_venue_ids: venueIds
+                })
+                
+                console.log('RPC upsert_user_profile result:', { rpcResult, profileError: profileError?.message })
 
-            if (profileError) {
-                console.error('Error upserting user profile:', profileError)
-                return NextResponse.json({ 
-                    error: 'Database error creating new user',
-                    details: profileError.message 
-                }, { status: 500 })
+                if (profileError) {
+                    console.error('Error upserting user profile:', profileError)
+                    return NextResponse.json({ 
+                        error: 'Database error creating new user',
+                        details: profileError.message 
+                    }, { status: 500 })
+                }
             }
             
             // Verify the profile was created correctly
