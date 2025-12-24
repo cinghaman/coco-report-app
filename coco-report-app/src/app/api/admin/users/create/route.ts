@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
         
         console.log('Processed venue IDs:', venueIds)
 
-        // 3. Create the user using the Service Role Key
+        // 3. Initialize Supabase admin client
         const supabaseAdmin = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -64,6 +64,49 @@ export async function POST(request: NextRequest) {
             }
         )
 
+        // 4. Check if user with this email already exists (from previous deletion or creation)
+        // If exists, delete it first to allow recreation
+        try {
+            // Check in auth.users by email
+            const { data: existingAuthUsers } = await supabaseAdmin.auth.admin.listUsers()
+            const existingAuthUser = existingAuthUsers?.users?.find(u => u.email === email)
+            
+            if (existingAuthUser) {
+                console.log('Found existing auth user with same email, deleting before recreation:', existingAuthUser.id)
+                
+                // Delete the existing auth user (this will cascade delete the profile via trigger)
+                const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(existingAuthUser.id)
+                
+                if (deleteAuthError && deleteAuthError.message !== 'User not found') {
+                    console.warn('Error deleting existing auth user:', deleteAuthError)
+                    // Continue anyway - try to create the user
+                } else {
+                    console.log('Successfully deleted existing auth user')
+                    // Wait a moment for deletion to complete
+                    await new Promise(resolve => setTimeout(resolve, 300))
+                }
+            }
+            
+            // Also check and clean up any orphaned profile (in case auth user was deleted but profile remains)
+            const { data: existingProfile } = await supabaseAdmin
+                .from('users')
+                .select('id, email')
+                .eq('email', email)
+                .maybeSingle()
+            
+            if (existingProfile) {
+                console.log('Found orphaned profile with same email, deleting:', existingProfile.id)
+                await supabaseAdmin
+                    .from('users')
+                    .delete()
+                    .eq('id', existingProfile.id)
+            }
+        } catch (cleanupError) {
+            console.warn('Error during cleanup of existing user:', cleanupError)
+            // Continue with user creation anyway
+        }
+
+        // 5. Create the user using the Service Role Key
         const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
             email,
             password,
