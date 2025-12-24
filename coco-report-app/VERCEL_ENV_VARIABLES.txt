@@ -16,6 +16,10 @@ NEXT_PUBLIC_SUPABASE_URL=https://wnwzifhngkynpxknovii.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_mRwlPF-Tud5YVPObKmVhWw_wV_4H5QB
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 
+# App URL (Required for password reset links)
+# Set this to your production URL so password reset emails use the correct link
+NEXT_PUBLIC_APP_URL=https://coco-report-app.vercel.app
+
 # Mailgun Email Configuration
 MAILGUN_API_KEY=your_mailgun_api_key_here
 MAILGUN_DOMAIN=coco-notifications.info

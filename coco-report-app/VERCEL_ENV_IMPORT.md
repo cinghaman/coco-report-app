@@ -12,6 +12,7 @@ Copy all the variables from `.env.example` or use the list below:
 NEXT_PUBLIC_SUPABASE_URL=https://wnwzifhngkynpxknovii.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_mRwlPF-Tud5YVPObKmVhWw_wV_4H5QB
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+NEXT_PUBLIC_APP_URL=https://coco-report-app.vercel.app
 MAILGUN_API_KEY=your_mailgun_api_key_here
 MAILGUN_DOMAIN=coco-notifications.info
 MAILGUN_API_URL=https://api.eu.mailgun.net
@@ -37,6 +38,7 @@ MAILGUN_FROM_NAME=Coco Reporting
 ✅ **These are already set correctly:**
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_APP_URL` (for password reset links)
 - `MAILGUN_API_KEY`
 - `MAILGUN_DOMAIN`
 - `MAILGUN_API_URL`
@@ -103,6 +105,9 @@ vercel env add NEXT_PUBLIC_SUPABASE_URL preview
 - [ ] `NEXT_PUBLIC_SUPABASE_URL`
 - [ ] `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` ⚠️ **You need to get this from Supabase**
+
+### App URL (1 variable)
+- [ ] `NEXT_PUBLIC_APP_URL` ✅ Set to `https://coco-report-app.vercel.app` (required for password reset links)
 
 ### Mailgun (5 variables)
 - [ ] `MAILGUN_API_KEY` ✅ Already provided

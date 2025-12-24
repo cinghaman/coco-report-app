@@ -24,12 +24,22 @@ export async function POST(request: NextRequest) {
       }
     )
 
+    // Determine the correct app URL for redirect
+    // Priority: NEXT_PUBLIC_APP_URL > VERCEL_URL > request origin
+    let appUrl = request.nextUrl.origin
+    if (process.env.NEXT_PUBLIC_APP_URL) {
+      appUrl = process.env.NEXT_PUBLIC_APP_URL
+    } else if (process.env.VERCEL_URL) {
+      // VERCEL_URL is provided by Vercel automatically (e.g., "coco-report-app.vercel.app")
+      appUrl = `https://${process.env.VERCEL_URL}`
+    }
+    
     // Generate password reset token using Supabase Admin API
     const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: email,
       options: {
-        redirectTo: `${request.nextUrl.origin}/auth/reset-password`,
+        redirectTo: `${appUrl}/auth/reset-password`,
       }
     })
 
@@ -66,7 +76,8 @@ export async function POST(request: NextRequest) {
       url: process.env.MAILGUN_API_URL || 'https://api.eu.mailgun.net'
     })
 
-    const resetLink = resetData.properties?.action_link || `${request.nextUrl.origin}/auth/reset-password?token=${resetData.properties?.hashed_token}`
+    // Use the same app URL for the reset link
+    const resetLink = resetData.properties?.action_link || `${appUrl}/auth/reset-password?token=${resetData.properties?.hashed_token}`
     
     const resetSubject = 'Password Reset Request - Coco Reporting System'
     const resetHtml = `
