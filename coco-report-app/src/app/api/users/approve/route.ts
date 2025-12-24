@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/auth'
+import Mailgun from 'mailgun.js'
+import FormData from 'form-data'
 
 export async function POST(request: NextRequest) {
     try {
@@ -69,17 +71,29 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Send email notification to user when approved
+        // Send email notification to user when approved directly via Mailgun
         if (approved && userToApprove) {
             try {
-                // Determine app URL for email links
-                const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : request.nextUrl.origin)
+                const mailgunApiKey = process.env.MAILGUN_API_KEY
+                
+                if (mailgunApiKey) {
+                    // Determine app URL for email links
+                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : request.nextUrl.origin)
 
-                const emailResponse = await fetch(`${appUrl}/api/send-email-unauthenticated`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
+                    const mailgunDomain = process.env.MAILGUN_DOMAIN || 'coco-notifications.info'
+                    const fromEmail = process.env.MAILGUN_FROM_EMAIL || `postmaster@${mailgunDomain}`
+                    const fromName = process.env.MAILGUN_FROM_NAME || 'Coco Reporting'
+
+                    const mailgun = new Mailgun(FormData)
+                    const mg = mailgun.client({
+                        username: 'api',
+                        key: mailgunApiKey,
+                        url: process.env.MAILGUN_API_URL || 'https://api.eu.mailgun.net'
+                    })
+
+                    const data = await mg.messages.create(mailgunDomain, {
+                        from: `${fromName} <${fromEmail}>`,
                         to: userToApprove.email,
                         subject: 'Account Approved - Coco Reporting System',
                         html: `
@@ -92,13 +106,10 @@ export async function POST(request: NextRequest) {
                             <p>Best regards,<br>Coco Reporting Team</p>
                         `
                     })
-                })
 
-                if (emailResponse.ok) {
-                    console.log('User approval email sent successfully')
+                    console.log('User approval email sent successfully:', data.id)
                 } else {
-                    const errorData = await emailResponse.json()
-                    console.error('Failed to send approval email:', errorData)
+                    console.warn('Mailgun API key not configured, skipping approval email')
                 }
             } catch (emailError) {
                 console.error('Error sending approval email:', emailError)

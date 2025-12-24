@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/auth'
 import { createClient } from '@supabase/supabase-js'
+import Mailgun from 'mailgun.js'
+import FormData from 'form-data'
 
 export async function POST(request: NextRequest) {
     try {
@@ -96,64 +98,87 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Send email notifications
+        // Send email notifications directly via Mailgun
         try {
-            // 1. Notify admins about new user
-            const { data: adminUsers } = await supabaseAdmin
-                .from('users')
-                .select('email, display_name')
-                .in('role', ['admin', 'owner'])
-
-            const adminEmails = adminUsers?.map(u => u.email).filter(Boolean) || []
+            const mailgunApiKey = process.env.MAILGUN_API_KEY
             
-            if (adminEmails.length > 0) {
-                const adminSubject = `New User Created - ${displayName}`
-                const adminHtml = `
-                    <h2>New User Created</h2>
-                    <p><strong>Name:</strong> ${displayName}</p>
-                    <p><strong>Email:</strong> ${email}</p>
-                    <p><strong>Role:</strong> ${role}</p>
-                    <p><strong>Created by:</strong> ${currentUser.email}</p>
-                    <p>The user has been automatically approved and can now log in.</p>
-                `
+            if (!mailgunApiKey) {
+                console.warn('Mailgun API key not configured, skipping email notifications')
+            } else {
+                const mailgunDomain = process.env.MAILGUN_DOMAIN || 'coco-notifications.info'
+                const fromEmail = process.env.MAILGUN_FROM_EMAIL || `postmaster@${mailgunDomain}`
+                const fromName = process.env.MAILGUN_FROM_NAME || 'Coco Reporting'
 
-                await fetch(`${request.nextUrl.origin}/api/send-email`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        to: adminEmails,
-                        subject: adminSubject,
-                        html: adminHtml
+                const mailgun = new Mailgun(FormData)
+                const mg = mailgun.client({
+                    username: 'api',
+                    key: mailgunApiKey,
+                    url: process.env.MAILGUN_API_URL || 'https://api.eu.mailgun.net'
+                })
+
+                // 1. Notify admins about new user
+                const { data: adminUsers } = await supabaseAdmin
+                    .from('users')
+                    .select('email, display_name')
+                    .in('role', ['admin', 'owner'])
+
+                const adminEmails = adminUsers?.map(u => u.email).filter(Boolean) || []
+                
+                if (adminEmails.length > 0) {
+                    try {
+                        const adminSubject = `New User Created - ${displayName}`
+                        const adminHtml = `
+                            <h2>New User Created</h2>
+                            <p><strong>Name:</strong> ${displayName}</p>
+                            <p><strong>Email:</strong> ${email}</p>
+                            <p><strong>Role:</strong> ${role}</p>
+                            <p><strong>Created by:</strong> ${currentUser.email}</p>
+                            <p>The user has been automatically approved and can now log in.</p>
+                        `
+
+                        const adminData = await mg.messages.create(mailgunDomain, {
+                            from: `${fromName} <${fromEmail}>`,
+                            to: adminEmails,
+                            subject: adminSubject,
+                            html: adminHtml
+                        })
+
+                        console.log('Admin notification email sent successfully:', adminData.id)
+                    } catch (adminEmailError) {
+                        console.error('Error sending admin notification email:', adminEmailError)
+                    }
+                }
+
+                // 2. Send welcome email to new user with password setup instructions
+                try {
+                    const welcomeSubject = 'Welcome to Coco Reporting System'
+                    const welcomeHtml = `
+                        <h2>Welcome to Coco Reporting System!</h2>
+                        <p>Hello ${displayName},</p>
+                        <p>Your account has been created successfully.</p>
+                        <p><strong>Your login credentials:</strong></p>
+                        <ul>
+                            <li><strong>Email:</strong> ${email}</li>
+                            <li><strong>Password:</strong> ${password}</li>
+                        </ul>
+                        <p><strong>Important:</strong> Please change your password after your first login for security.</p>
+                        <p>You can log in at: <a href="${request.nextUrl.origin}/login">${request.nextUrl.origin}/login</a></p>
+                        <p>If you have any questions, please contact your administrator.</p>
+                        <p>Best regards,<br>Coco Reporting Team</p>
+                    `
+
+                    const welcomeData = await mg.messages.create(mailgunDomain, {
+                        from: `${fromName} <${fromEmail}>`,
+                        to: email,
+                        subject: welcomeSubject,
+                        html: welcomeHtml
                     })
-                })
+
+                    console.log('Welcome email sent successfully:', welcomeData.id)
+                } catch (welcomeEmailError) {
+                    console.error('Error sending welcome email:', welcomeEmailError)
+                }
             }
-
-            // 2. Send welcome email to new user with password setup instructions
-            const welcomeSubject = 'Welcome to Coco Reporting System'
-            const welcomeHtml = `
-                <h2>Welcome to Coco Reporting System!</h2>
-                <p>Hello ${displayName},</p>
-                <p>Your account has been created successfully.</p>
-                <p><strong>Your login credentials:</strong></p>
-                <ul>
-                    <li><strong>Email:</strong> ${email}</li>
-                    <li><strong>Password:</strong> ${password}</li>
-                </ul>
-                <p><strong>Important:</strong> Please change your password after your first login for security.</p>
-                <p>You can log in at: <a href="${request.nextUrl.origin}/login">${request.nextUrl.origin}/login</a></p>
-                <p>If you have any questions, please contact your administrator.</p>
-                <p>Best regards,<br>Coco Reporting Team</p>
-            `
-
-            await fetch(`${request.nextUrl.origin}/api/send-email`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    to: email,
-                    subject: welcomeSubject,
-                    html: welcomeHtml
-                })
-            })
         } catch (emailError) {
             console.error('Error sending email notifications:', emailError)
             // Don't fail user creation if email fails
