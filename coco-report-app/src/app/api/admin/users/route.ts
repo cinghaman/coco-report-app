@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import Mailgun from 'mailgun.js'
 import FormData from 'form-data'
+import { sendUserCreationEmails, getBaseUrl } from '@/lib/email-user-creation'
 
 export async function GET() {
   try {
@@ -103,6 +104,29 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (fetchError) throw fetchError
+
+    const baseUrl = getBaseUrl(request)
+    const { data: adminUsers } = await supabaseAdmin!
+      .from('users')
+      .select('email')
+      .in('role', ['admin', 'owner'])
+    const adminEmails = adminUsers?.map((u) => u.email).filter(Boolean) ?? []
+
+    console.log('[legacy create user] Sending admin + welcome emails (admins=%d, newUser=%s)', adminEmails.length, email)
+    const { adminSent, welcomeSent } = await sendUserCreationEmails({
+      displayName: display_name,
+      email,
+      password,
+      role: userRole,
+      createdBy: 'Admin',
+      baseUrl,
+      adminEmails,
+    })
+    if (adminSent && welcomeSent) {
+      console.log('[legacy create user] Admin and welcome emails sent successfully')
+    } else {
+      console.warn('[legacy create user] Emails partially sent:', { adminSent, welcomeSent })
+    }
 
     return NextResponse.json(userData)
   } catch (error: unknown) {

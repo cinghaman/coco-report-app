@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/auth'
 import { createClient } from '@supabase/supabase-js'
-import Mailgun from 'mailgun.js'
-import FormData from 'form-data'
+import { sendUserCreationEmails, getBaseUrl } from '@/lib/email-user-creation'
 
 export async function POST(request: NextRequest) {
     try {
@@ -184,120 +183,35 @@ export async function POST(request: NextRequest) {
             }, { status: 500 })
         }
 
-        // Return success response IMMEDIATELY (before emails) so user creation succeeds even if emails fail
-        // This prevents 500 errors from email issues
-        const successResponse = NextResponse.json({ 
-            user: newUser.user, 
+        const baseUrl = getBaseUrl(request)
+        const { data: adminUsers } = await supabaseAdmin
+            .from('users')
+            .select('email')
+            .in('role', ['admin', 'owner'])
+        const adminEmails = adminUsers?.map((u) => u.email).filter(Boolean) ?? []
+
+        console.log('[create user] Sending admin + welcome emails (admins=%d, newUser=%s)', adminEmails.length, email)
+        const { adminSent, welcomeSent } = await sendUserCreationEmails({
+            displayName,
+            email,
+            password,
+            role,
+            createdBy: currentUser.email,
+            baseUrl,
+            adminEmails,
+        })
+        if (adminSent && welcomeSent) {
+            console.log('[create user] Admin and welcome emails sent successfully')
+        } else {
+            console.warn('[create user] Emails partially sent:', { adminSent, welcomeSent })
+        }
+
+        return NextResponse.json({
+            user: newUser.user,
             message: 'User created successfully',
-            displayName: displayName,
-            venueIds: venueIds
+            displayName,
+            venueIds,
         })
-
-        // Send email notifications directly via Mailgun (fire-and-forget, non-blocking)
-        // Don't await - let it run in background so user creation response isn't delayed
-        // Wrap in Promise.resolve().then() to ensure it doesn't block the response
-        Promise.resolve().then(async () => {
-            try {
-                const mailgunApiKey = process.env.MAILGUN_API_KEY
-                
-                if (!mailgunApiKey) {
-                    console.warn('Mailgun API key not configured, skipping email notifications')
-                    return
-                }
-
-                const mailgunDomain = process.env.MAILGUN_DOMAIN || 'coco-notifications.info'
-                const fromEmail = process.env.MAILGUN_FROM_EMAIL || `postmaster@${mailgunDomain}`
-                const fromName = process.env.MAILGUN_FROM_NAME || 'Coco Reporting'
-
-                const mailgun = new Mailgun(FormData)
-                const mg = mailgun.client({
-                    username: 'api',
-                    key: mailgunApiKey,
-                    url: process.env.MAILGUN_API_URL || 'https://api.eu.mailgun.net'
-                })
-
-                // 1. Notify admins about new user
-                try {
-                    const { data: adminUsers } = await supabaseAdmin
-                        .from('users')
-                        .select('email, display_name, role')
-                        .in('role', ['admin', 'owner'])
-
-                    const adminEmails = adminUsers?.map(u => u.email).filter(Boolean) || []
-                    
-                    // Always include these admin emails as fallback/ensure they're included
-                    const requiredAdminEmails = ['admin@thoughtbulb.dev', 'shetty.aneet@gmail.com']
-                    const allAdminEmails = [...new Set([...adminEmails, ...requiredAdminEmails])] // Remove duplicates
-                    
-                    console.log('User creation notification - Admin emails:', {
-                        fromDatabase: adminEmails,
-                        totalRecipients: allAdminEmails,
-                        adminUsersFound: adminUsers?.length || 0
-                    })
-                    
-                    if (allAdminEmails.length > 0) {
-                        const adminSubject = `New User Created - ${displayName}`
-                        const adminHtml = `
-                            <h2>New User Created</h2>
-                            <p><strong>Name:</strong> ${displayName}</p>
-                            <p><strong>Email:</strong> ${email}</p>
-                            <p><strong>Role:</strong> ${role}</p>
-                            <p><strong>Created by:</strong> ${currentUser.email}</p>
-                            <p>The user has been automatically approved and can now log in.</p>
-                        `
-
-                        const adminData = await mg.messages.create(mailgunDomain, {
-                            from: `${fromName} <${fromEmail}>`,
-                            to: allAdminEmails,
-                            subject: adminSubject,
-                            html: adminHtml
-                        })
-
-                        console.log('Admin notification email sent successfully to:', allAdminEmails, 'Message ID:', adminData.id)
-                    }
-                } catch (adminEmailError) {
-                    console.error('Error sending admin notification email:', adminEmailError)
-                }
-
-                // 2. Send welcome email to new user with password setup instructions
-                try {
-                    const welcomeSubject = 'Welcome to Coco Reporting System'
-                    const welcomeHtml = `
-                        <h2>Welcome to Coco Reporting System!</h2>
-                        <p>Hello ${displayName},</p>
-                        <p>Your account has been created successfully.</p>
-                        <p><strong>Your login credentials:</strong></p>
-                        <ul>
-                            <li><strong>Email:</strong> ${email}</li>
-                            <li><strong>Password:</strong> ${password}</li>
-                        </ul>
-                        <p><strong>Important:</strong> Please change your password after your first login for security.</p>
-                        <p>You can log in at: <a href="${request.nextUrl.origin}/login">${request.nextUrl.origin}/login</a></p>
-                        <p>If you have any questions, please contact your administrator.</p>
-                        <p>Best regards,<br>Coco Reporting Team</p>
-                    `
-
-                    const welcomeData = await mg.messages.create(mailgunDomain, {
-                        from: `${fromName} <${fromEmail}>`,
-                        to: email,
-                        subject: welcomeSubject,
-                        html: welcomeHtml
-                    })
-
-                    console.log('Welcome email sent successfully:', welcomeData.id)
-                } catch (welcomeEmailError) {
-                    console.error('Error sending welcome email:', welcomeEmailError)
-                }
-            } catch (emailError) {
-                console.error('Error in email notification process:', emailError)
-                // Don't fail user creation if email fails
-            }
-        }).catch((err: unknown) => {
-            console.error('Unhandled error in email notification:', err)
-        })
-
-        // Return success response immediately (emails will be sent in background)
-        return successResponse
 
     } catch (error: unknown) {
         console.error('Error in create user endpoint:', error)
