@@ -48,8 +48,6 @@ export default function LoginPage() {
     setError('')
     setMessage('')
 
-    setMessage('')
-
     if (!supabase) {
       setError('Client not initialized')
       setLoading(false)

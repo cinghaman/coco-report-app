@@ -33,40 +33,56 @@ export async function proxy(request: NextRequest) {
 
   // Refresh session if expired - required for Server Components
   // https://supabase.com/docs/guides/auth/server-side/nextjs
+  // Use getUser() (not getSession()) – validates JWT server-side.
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Allow access to auth callback and pending approval pages
+  const copyCookiesTo = (target: NextResponse) => {
+    response.cookies.getAll().forEach(({ name, value }) =>
+      target.cookies.set(name, value)
+    )
+  }
+
+  // Allow access to login, auth callback, and pending approval (no auth required)
+  const path = request.nextUrl.pathname
   if (
-    request.nextUrl.pathname.startsWith('/auth/callback') ||
-    request.nextUrl.pathname.startsWith('/pending-approval')
+    path.startsWith('/login') ||
+    path.startsWith('/auth') ||
+    path.startsWith('/pending-approval')
   ) {
     return response
   }
 
-  // Protect routes - redirect to login if not authenticated
-  if (request.nextUrl.pathname.startsWith('/dashboard') && !user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  // Protect app routes - redirect to login if not authenticated
+  const protectedPaths = ['/dashboard', '/reports', '/admin', '/analytics']
+  const isProtected = protectedPaths.some((p) => path.startsWith(p))
+  if (isProtected && !user) {
+    const redirectRes = NextResponse.redirect(new URL('/login', request.url))
+    copyCookiesTo(redirectRes)
+    return redirectRes
   }
 
-  // Check if user is approved (for authenticated users accessing protected routes)
-  if (user && request.nextUrl.pathname.startsWith('/dashboard')) {
+  // Check if user is approved (for authenticated users on protected routes)
+  if (user && isProtected) {
     const { data: userProfile } = await supabase
       .from('users')
       .select('approved, email')
       .eq('id', user.id)
       .single()
 
-    // Super admins bypass approval check
     const superAdminEmails = ['admin@thoughtbulb.dev', 'shetty.aneet@gmail.com']
     const isSuperAdmin = userProfile?.email && superAdminEmails.includes(userProfile.email)
 
     if (userProfile && !userProfile.approved && !isSuperAdmin) {
-      return NextResponse.redirect(new URL('/pending-approval', request.url))
+      const redirectRes = NextResponse.redirect(new URL('/pending-approval', request.url))
+      copyCookiesTo(redirectRes)
+      return redirectRes
     }
   }
 
-  if (request.nextUrl.pathname === '/' && user) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  if (path === '/' && user) {
+    const redirectRes = NextResponse.redirect(new URL('/dashboard', request.url))
+    copyCookiesTo(redirectRes)
+    return redirectRes
   }
 
   return response
