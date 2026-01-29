@@ -53,7 +53,6 @@ export async function POST(request: NextRequest) {
 
     const { email, password, display_name, role, venue_ids } = await request.json()
 
-    // Validate required fields
     if (!email || !password || !display_name || !role) {
       return NextResponse.json(
         { error: 'Missing required fields' },
@@ -61,35 +60,57 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create auth user
+    const validRoles = ['staff', 'admin', 'owner']
+    const userRole = validRoles.includes(role) ? role : 'staff'
+
+    // Create auth user (handle_new_user trigger inserts into users)
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true
+      email_confirm: true,
+      user_metadata: {
+        full_name: display_name,
+        name: display_name,
+        display_name,
+        role,
+      },
     })
 
     if (authError) throw authError
 
-    // Create user profile
-    const { data: userData, error: profileError } = await supabaseAdmin
-      .from('users')
-      .insert([{
-        id: authData.user.id,
-        email,
-        display_name,
-        role,
-        venue_ids: venue_ids || []
-      }])
-      .select()
-      .single()
+    const venueIds = Array.isArray(venue_ids) ? venue_ids : (venue_ids ? [venue_ids] : [])
+
+    // Wait for handle_new_user trigger, then upsert profile (avoids duplicate key)
+    await new Promise((r) => setTimeout(r, 500))
+
+    const { error: profileError } = await supabaseAdmin.rpc('upsert_user_profile', {
+      p_user_id: authData.user.id,
+      p_email: email,
+      p_display_name: display_name,
+      p_role: userRole,
+      p_approved: true,
+      p_approved_by: null,
+      p_approved_at: new Date().toISOString(),
+      p_venue_ids: venueIds,
+    })
 
     if (profileError) throw profileError
+
+    const { data: userData, error: fetchError } = await supabaseAdmin
+      .from('users')
+      .select()
+      .eq('id', authData.user.id)
+      .single()
+
+    if (fetchError) throw fetchError
 
     return NextResponse.json(userData)
   } catch (error: unknown) {
     console.error('Error creating user:', error)
+    const err = error as { message?: string; details?: string; code?: string }
+    const message = err?.message ?? (error instanceof Error ? error.message : 'Failed to create user')
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create user' },
+      { error: message, ...(err?.details && { details: err.details }) },
       { status: 500 }
     )
   }
