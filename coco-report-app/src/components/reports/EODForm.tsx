@@ -599,19 +599,47 @@ export default function EODForm({ user, initialData }: EODFormProps) {
 
           const action = initialData ? 'Updated' : 'Created'
           const subject = `EOD Report ${action} - ${venueName} - ${formData.for_date}`
+
+          const fmt = (n: number) => n.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })
+          const totalService = (getTotalServiceKwotowy() + formData.service_10_percent) * 0.75
+          const totalCardPayment = formData.card_1 + formData.card_2
+          const totalIncomeFromDelivery = (formData.przelew + formData.glovo + formData.uber + formData.wolt + formData.pyszne + formData.bolt) * 0.70
+          const totalCash = formData.cash + formData.flavor + formData.cash_deposits + formData.total_sale_with_special_payment + formData.drawer - getTotalWithdrawals() - totalService
+
           const body = `
             <h2>EOD Report ${action}</h2>
             <p><strong>Venue:</strong> ${venueName}</p>
             <p><strong>Date:</strong> ${formData.for_date}</p>
             <p><strong>${initialData ? 'Updated' : 'Created'} by:</strong> ${user.display_name || user.email}</p>
-            <p><strong>Status:</strong> ${status === 'submitted' ? 'Submitted' : 'Draft'}</p>
-            <h3>Sales Summary</h3>
-            <ul>
-              <li><strong>Total Sales:</strong> ${formData.total_sale_gross.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}</li>
-              <li><strong>Gross Revenue:</strong> ${formData.gross_revenue.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}</li>
-              <li><strong>Net Revenue:</strong> ${formData.net_revenue.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}</li>
-            </ul>
+            <p><strong>Status:</strong> Submitted</p>
+            <p><strong>Total Sales (Gross):</strong> ${fmt(formData.total_sale_gross)}</p>
+
+            <h3>Mini Calculations</h3>
+            <table style="border-collapse: collapse; margin-bottom: 16px;">
+              <tr><td style="padding: 6px 12px 6px 0;"><strong>Total Service</strong></td><td style="padding: 6px 0;">${fmt(totalService)}</td></tr>
+              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">(Service Kwotowy + Service 10%) × 0.75</td></tr>
+              <tr><td style="padding: 6px 12px 6px 0;"><strong>Total Card Payment</strong></td><td style="padding: 6px 0;">${fmt(totalCardPayment)}</td></tr>
+              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Card 1 + Card 2</td></tr>
+              <tr><td style="padding: 6px 12px 6px 0;"><strong>Total Cash</strong></td><td style="padding: 6px 0;">${fmt(totalCash)}</td></tr>
+              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Cash + Flavor + Cash Deposits + Representacja 2 + Drawer - Withdrawals - Total Service</td></tr>
+              <tr><td style="padding: 6px 12px 6px 0;"><strong>Total Income from Delivery Apps</strong></td><td style="padding: 6px 0;">${fmt(totalIncomeFromDelivery)}</td></tr>
+              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">(Przelew + Glovo + Uber + Wolt + Pyszne + Bolt) × 0.70</td></tr>
+            </table>
+
+            <h3>End of Day Sales</h3>
+            <table style="border-collapse: collapse; margin-bottom: 16px;">
+              <tr><td style="padding: 6px 12px 6px 0;"><strong>Gross Revenue</strong></td><td style="padding: 6px 0;">${fmt(formData.gross_revenue)}</td></tr>
+              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Total Card Payment + Total Income from Delivery + Representacja 2 + Cash + Flavor + Cash Deposits</td></tr>
+              <tr><td style="padding: 6px 12px 6px 0;"><strong>Net Revenue</strong></td><td style="padding: 6px 0;">${fmt(formData.net_revenue)}</td></tr>
+              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Gross Revenue - Total Withdrawals - Total Service</td></tr>
+            </table>
+
             <p>Please review the report in the admin dashboard.</p>
+
+            <hr style="margin: 24px 0; border: none; border-top: 1px solid #ddd;" />
+            <p style="font-size: 12px; color: #666;">
+              <a href="https://coco-report-app.vercel.app/">Coco Reporting</a>
+            </p>
           `
 
           // Use server-side API to send emails (avoids CORS issues)
