@@ -185,7 +185,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
   const calculateTotalCash = (report: DailyReport) => {
     // Calculate total service kwotowy (we'll need to fetch this data separately for accurate calculation)
     // For now, using service_10_percent as approximation
-    const totalService = (report.service_10_percent || 0) * 0.75
+    const totalService = (report.service_10_percent || 0) * 0.90
     
     // Total Cash formula: Cash + Flavor + Cash Deposits + Representacja 2 + Drawer - Withdrawals - Total Service
     return (report.cash || 0) + 

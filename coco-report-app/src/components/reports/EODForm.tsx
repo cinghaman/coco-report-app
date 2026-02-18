@@ -501,7 +501,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
 
   // Auto-calculate net revenue
   useEffect(() => {
-    const totalService = (getTotalServiceKwotowy() + formData.service_10_percent) * 0.75
+    const totalService = (getTotalServiceKwotowy() + formData.service_10_percent) * 0.90
     const netRevenue = formData.gross_revenue - getTotalWithdrawals() - totalService
     setFormData(prev => ({ ...prev, net_revenue: netRevenue }))
   }, [formData.gross_revenue, formData.service_10_percent, withdrawals, serviceKwotowy])
@@ -601,7 +601,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
           const subject = `EOD Report ${action} - ${venueName} - ${formData.for_date}`
 
           const fmt = (n: number) => n.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })
-          const totalService = (getTotalServiceKwotowy() + formData.service_10_percent) * 0.75
+          const totalService = (getTotalServiceKwotowy() + formData.service_10_percent) * 0.90
           const totalCardPayment = formData.card_1 + formData.card_2
           const totalIncomeFromDelivery = (formData.przelew + formData.glovo + formData.uber + formData.wolt + formData.pyszne + formData.bolt) * 0.70
           const totalCash = formData.cash + formData.flavor + formData.cash_deposits + formData.total_sale_with_special_payment + formData.drawer - getTotalWithdrawals() - totalService
@@ -617,7 +617,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
             <h3>Mini Calculations</h3>
             <table style="border-collapse: collapse; margin-bottom: 16px;">
               <tr><td style="padding: 6px 12px 6px 0;"><strong>Total Service</strong></td><td style="padding: 6px 0;">${fmt(totalService)}</td></tr>
-              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">(Service Kwotowy + Service 10%) × 0.75</td></tr>
+              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">(Service Kwotowy + Service 10%) × 0.90</td></tr>
               <tr><td style="padding: 6px 12px 6px 0;"><strong>Total Card Payment</strong></td><td style="padding: 6px 0;">${fmt(totalCardPayment)}</td></tr>
               <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Card 1 + Card 2</td></tr>
               <tr><td style="padding: 6px 12px 6px 0;"><strong>Total Cash</strong></td><td style="padding: 6px 0;">${fmt(totalCash)}</td></tr>
@@ -1303,10 +1303,10 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
                 <div className="text-sm font-medium text-purple-700 mb-1">Total Service</div>
                 <div className="text-xl font-bold text-purple-900">
-                  {formatCurrency((getTotalServiceKwotowy() + formData.service_10_percent) * 0.75)}
+                  {formatCurrency((getTotalServiceKwotowy() + formData.service_10_percent) * 0.90)}
                 </div>
                 <div className="text-xs text-purple-600 mt-1">
-                  (Service Kwotowy + Service 10%) × 0.75
+                  (Service Kwotowy + Service 10%) × 0.90
                 </div>
               </div>
 
@@ -1327,7 +1327,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
                 <div className="text-xl font-bold text-green-900">
                   {formatCurrency(
                     formData.cash + formData.flavor + formData.cash_deposits + formData.total_sale_with_special_payment + formData.drawer -
-                    getTotalWithdrawals() - ((getTotalServiceKwotowy() + formData.service_10_percent) * 0.75)
+                    getTotalWithdrawals() - ((getTotalServiceKwotowy() + formData.service_10_percent) * 0.90)
                   )}
                 </div>
                 <div className="text-xs text-green-600 mt-1">

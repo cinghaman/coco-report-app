@@ -493,10 +493,10 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
             <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
               <div className="text-sm font-medium text-purple-700 mb-1">Total Service</div>
               <div className="text-xl font-bold text-purple-900">
-                {formatCurrency((serviceKwotowy.reduce((sum, s) => sum + s.amount, 0) + report.service_10_percent) * 0.75)}
+                {formatCurrency((serviceKwotowy.reduce((sum, s) => sum + s.amount, 0) + report.service_10_percent) * 0.90)}
               </div>
               <div className="text-xs text-purple-600 mt-1">
-                (Service Kwotowy + Service 10%) × 0.75
+                (Service Kwotowy + Service 10%) × 0.90
               </div>
             </div>
 
@@ -518,7 +518,7 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
                 {formatCurrency(
                   report.cash + (report.flavor || 0) + report.cash_deposits + report.total_sale_with_special_payment + report.drawer - 
                   withdrawals.reduce((sum, w) => sum + w.amount, 0) - 
-                  ((serviceKwotowy.reduce((sum, s) => sum + s.amount, 0) + report.service_10_percent) * 0.75)
+                  ((serviceKwotowy.reduce((sum, s) => sum + s.amount, 0) + report.service_10_percent) * 0.90)
                 )}
               </div>
               <div className="text-xs text-green-600 mt-1">
