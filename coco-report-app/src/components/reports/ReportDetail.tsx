@@ -297,6 +297,7 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
               <dt className="text-sm font-medium text-gray-500">Total Sales (Gross)</dt>
               <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                 {formatCurrency(report.total_sale_gross)}
+                <p className="text-xs text-gray-500 mt-0.5">Excludes Drawer</p>
               </dd>
             </div>
             <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">

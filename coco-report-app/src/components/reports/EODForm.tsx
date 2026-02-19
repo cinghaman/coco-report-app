@@ -479,15 +479,15 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     setFormData(prev => ({ ...prev, withdrawal: getTotalWithdrawals() }))
   }, [withdrawals])
 
-  // Auto-calculate total_sale_gross (excluding Representacja 1, including cash_deposits and drawer)
+  // Auto-calculate total_sale_gross (excluding Representacja 1, drawer cost; including cash_deposits)
   useEffect(() => {
     const calculatedTotal = formData.card_1 + formData.card_2 + formData.cash +
-      formData.flavor + formData.cash_deposits + formData.drawer +
+      formData.flavor + formData.cash_deposits +
       formData.przelew + formData.glovo + formData.uber +
       formData.wolt + formData.pyszne + formData.bolt +
       formData.total_sale_with_special_payment
     setFormData(prev => ({ ...prev, total_sale_gross: calculatedTotal }))
-  }, [formData.card_1, formData.card_2, formData.cash, formData.flavor, formData.cash_deposits, formData.drawer,
+  }, [formData.card_1, formData.card_2, formData.cash, formData.flavor, formData.cash_deposits,
   formData.przelew, formData.glovo, formData.uber, formData.wolt, formData.pyszne,
   formData.bolt, formData.total_sale_with_special_payment])
 
@@ -613,6 +613,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
             <p><strong>${initialData ? 'Updated' : 'Created'} by:</strong> ${user.display_name || user.email}</p>
             <p><strong>Status:</strong> Submitted</p>
             <p><strong>Total Sales (Gross):</strong> ${fmt(formData.total_sale_gross)}</p>
+            <p style="font-size: 12px; color: #666; margin-top: -8px;">Card 1 + Card 2 + Cash + Flavor + Cash Deposits + Przelew + Glovo + Uber + Wolt + Pyszne + Bolt + Representacja 2 (excludes Drawer)</p>
 
             <h3>Mini Calculations</h3>
             <table style="border-collapse: collapse; margin-bottom: 16px;">
@@ -954,7 +955,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
                 <span className="text-sm font-medium text-emerald-800">Total Sales (Gross) - Auto Calculated:</span>
                 <span className="text-2xl font-bold text-emerald-900">{formatCurrency(formData.total_sale_gross)}</span>
               </div>
-              <p className="text-xs text-emerald-700 mt-1">Sum of all payment methods below</p>
+              <p className="text-xs text-emerald-700 mt-1">Card 1 + Card 2 + Cash + Flavor + Cash Deposits + Przelew + Glovo + Uber + Wolt + Pyszne + Bolt + Representacja 2 (excludes Drawer)</p>
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
