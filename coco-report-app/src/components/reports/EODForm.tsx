@@ -625,6 +625,10 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Cash + Flavor + Cash Deposits + Representacja 2 + Drawer - Withdrawals - Total Service</td></tr>
               <tr><td style="padding: 6px 12px 6px 0;"><strong>Total Income from Delivery Apps</strong></td><td style="padding: 6px 0;">${fmt(totalIncomeFromDelivery)}</td></tr>
               <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">(Przelew + Glovo + Uber + Wolt + Pyszne + Bolt) × 0.70</td></tr>
+              <tr><td style="padding: 6px 12px 6px 0;"><strong>Locker from Previous</strong></td><td style="padding: 6px 0;">${fmt(formData.drawer)}</td></tr>
+              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Locker + Drawer from previous day</td></tr>
+              <tr><td style="padding: 6px 12px 6px 0;"><strong>Cash to Show</strong></td><td style="padding: 6px 0;">${fmt(totalCash)}</td></tr>
+              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Cash + Flavor + Cash Deposits + Representacja 2 + Drawer - Withdrawals - Total Service</td></tr>
             </table>
 
             <h3>End of Day Sales</h3>
@@ -633,6 +637,10 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Total Card Payment + Total Income from Delivery + Representacja 2 + Cash + Flavor + Cash Deposits</td></tr>
               <tr><td style="padding: 6px 12px 6px 0;"><strong>Net Revenue</strong></td><td style="padding: 6px 0;">${fmt(formData.net_revenue)}</td></tr>
               <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Gross Revenue - Total Withdrawals - Total Service</td></tr>
+              <tr><td style="padding: 6px 12px 6px 0;"><strong>Locker from Previous</strong></td><td style="padding: 6px 0;">${fmt(formData.drawer)}</td></tr>
+              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Locker + Drawer from previous day</td></tr>
+              <tr><td style="padding: 6px 12px 6px 0;"><strong>Cash to Show</strong></td><td style="padding: 6px 0;">${fmt(totalCash)}</td></tr>
+              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Cash + Flavor + Cash Deposits + Representacja 2 + Drawer - Withdrawals - Total Service</td></tr>
             </table>
 
             <p>Please review the report in the admin dashboard.</p>
@@ -1348,6 +1356,31 @@ export default function EODForm({ user, initialData }: EODFormProps) {
                   (Przelew + Glovo + Uber + Wolt + Pyszne + Bolt) × 0.70
                 </div>
               </div>
+
+              {/* Locker from Previous */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                <div className="text-sm font-medium text-slate-700 mb-1">Locker from Previous</div>
+                <div className="text-xl font-bold text-slate-900">
+                  {formatCurrency(formData.drawer)}
+                </div>
+                <div className="text-xs text-slate-600 mt-1">
+                  Locker + Drawer from previous day
+                </div>
+              </div>
+
+              {/* Cash to Show */}
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="text-sm font-medium text-amber-700 mb-1">Cash to Show</div>
+                <div className="text-xl font-bold text-amber-900">
+                  {formatCurrency(
+                    formData.cash + formData.flavor + formData.cash_deposits + formData.total_sale_with_special_payment + formData.drawer -
+                    getTotalWithdrawals() - ((getTotalServiceKwotowy() + formData.service_10_percent) * 0.90)
+                  )}
+                </div>
+                <div className="text-xs text-amber-600 mt-1">
+                  Cash + Flavor + Cash Deposits + Representacja 2 + Drawer - Withdrawals - Total Service
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1375,6 +1408,31 @@ export default function EODForm({ user, initialData }: EODFormProps) {
                 </div>
                 <div className="text-xs text-blue-600 mt-1">
                   Gross Revenue - Total Withdrawals - Total Service
+                </div>
+              </div>
+
+              {/* Locker from Previous */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                <div className="text-sm font-medium text-slate-700 mb-1">Locker from Previous</div>
+                <div className="text-xl font-bold text-slate-900">
+                  {formatCurrency(formData.drawer)}
+                </div>
+                <div className="text-xs text-slate-600 mt-1">
+                  Locker + Drawer from previous day
+                </div>
+              </div>
+
+              {/* Cash to Show */}
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="text-sm font-medium text-amber-700 mb-1">Cash to Show</div>
+                <div className="text-xl font-bold text-amber-900">
+                  {formatCurrency(
+                    formData.cash + formData.flavor + formData.cash_deposits + formData.total_sale_with_special_payment + formData.drawer -
+                    getTotalWithdrawals() - ((getTotalServiceKwotowy() + formData.service_10_percent) * 0.90)
+                  )}
+                </div>
+                <div className="text-xs text-amber-600 mt-1">
+                  Cash + Flavor + Cash Deposits + Representacja 2 + Drawer - Withdrawals - Total Service
                 </div>
               </div>
             </div>
