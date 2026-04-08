@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { User, DailyReport, Venue } from '@/lib/supabase'
+import { getTodaysCash } from '@/lib/todays-cash'
 import Link from 'next/link'
 
 interface DashboardContentProps {
@@ -182,21 +183,6 @@ export default function DashboardContent({ user }: DashboardContentProps) {
     return new Date(dateString).toLocaleDateString('pl-PL')
   }
 
-  const calculateTotalCash = (report: DailyReport) => {
-    // Calculate total service kwotowy (we'll need to fetch this data separately for accurate calculation)
-    // For now, using service_10_percent as approximation
-    const totalService = (report.service_10_percent || 0) * 0.90
-    
-    // Total Cash formula: Cash + Flavor + Cash Deposits + Representacja 2 + Drawer - Withdrawals - Total Service
-    return (report.cash || 0) + 
-           (report.flavor || 0) + 
-           (report.cash_deposits || 0) + 
-           (report.drawer || 0) + 
-           (report.total_sale_with_special_payment || 0) - 
-           (report.withdrawal || 0) - 
-           totalService
-  }
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-yellow-100 text-yellow-800'
@@ -366,7 +352,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                             {formatCurrency(report.net_revenue || 0)} net
                           </div>
                           <div className="text-xs text-gray-400">
-                            {formatCurrency(calculateTotalCash(report))} cash
+                            {formatCurrency(getTodaysCash(report))} cash
                           </div>
                         </div>
                         {user.role === 'admin' && (

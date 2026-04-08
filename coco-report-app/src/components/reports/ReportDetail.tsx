@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { User, DailyReport, Venue } from '@/lib/supabase'
+import { getTodaysCash } from '@/lib/todays-cash'
 
 interface ReportDetailProps {
   reportId: string
@@ -297,7 +298,6 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
               <dt className="text-sm font-medium text-gray-500">Total Sales (Gross)</dt>
               <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                 {formatCurrency(report.total_sale_gross)}
-                <p className="text-xs text-gray-500 mt-0.5">Excludes Drawer</p>
               </dd>
             </div>
             <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -322,12 +322,6 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
               <dt className="text-sm font-medium text-gray-500">Cash Deposits</dt>
               <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                 {formatCurrency(report.cash_deposits)}
-              </dd>
-            </div>
-            <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Drawer</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {formatCurrency(report.drawer)}
               </dd>
             </div>
             <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -512,18 +506,14 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
               </div>
             </div>
 
-            {/* Total Cash */}
+            {/* Today's cash */}
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div className="text-sm font-medium text-green-700 mb-1">Total Cash</div>
+              <div className="text-sm font-medium text-green-700 mb-1">Today&apos;s cash</div>
               <div className="text-xl font-bold text-green-900">
-                {formatCurrency(
-                  report.cash + (report.flavor || 0) + report.cash_deposits + report.total_sale_with_special_payment + report.drawer - 
-                  withdrawals.reduce((sum, w) => sum + w.amount, 0) - 
-                  ((serviceKwotowy.reduce((sum, s) => sum + s.amount, 0) + report.service_10_percent) * 0.90)
-                )}
+                {formatCurrency(getTodaysCash(report))}
               </div>
               <div className="text-xs text-green-600 mt-1">
-                Cash + Flavor + Cash Deposits + Representacja 2 + Drawer - Withdrawals - Total Service
+                Cash + Flavor + Cash Deposits + Representacja 2
               </div>
             </div>
 

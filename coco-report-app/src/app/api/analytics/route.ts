@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { cache, generateCacheKey } from '@/lib/cache'
+import { getTodaysCash } from '@/lib/todays-cash'
+
+function toDateOnly(isoOrDate: string): string {
+  if (isoOrDate.includes('T')) return isoOrDate.split('T')[0]
+  return isoOrDate.slice(0, 10)
+}
 
 // Updated analytics API with enhanced error handling and revenue reporting
 
@@ -71,6 +77,8 @@ export async function POST(request: NextRequest) {
         totalNetRevenue: 0,
         averageDailyGrossRevenue: 0,
         averageDailyNetRevenue: 0,
+        totalTodaysCash: 0,
+        averageDailyTodaysCash: 0,
         totalReports: 0,
         approvedReports: 0,
         pendingReports: 0,
@@ -102,6 +110,51 @@ export async function POST(request: NextRequest) {
       throw dailyAnalyticsError
     }
 
+    const startStr = toDateOnly(startDate)
+    const endStr = toDateOnly(endDate)
+
+    // Today's cash from raw report rows (retrospective: same formula for all historical data)
+    const PAGE = 1000
+    let offset = 0
+    const reportCashRows: Array<{
+      for_date: string
+      cash: number | null
+      flavor: number | null
+      cash_deposits: number | null
+      total_sale_with_special_payment: number | null
+    }> = []
+    for (;;) {
+      let q = supabaseAdmin
+        .from('daily_reports')
+        .select('for_date, cash, flavor, cash_deposits, total_sale_with_special_payment')
+        .gte('for_date', startStr)
+        .lte('for_date', endStr)
+        .order('for_date')
+        .range(offset, offset + PAGE - 1)
+      if (venueId) {
+        q = q.eq('venue_id', venueId)
+      }
+      const { data: chunk, error: cashRowsError } = await q
+      if (cashRowsError) {
+        console.error('daily_reports fetch for today\'s cash:', cashRowsError)
+        throw cashRowsError
+      }
+      if (!chunk?.length) break
+      reportCashRows.push(...chunk)
+      if (chunk.length < PAGE) break
+      offset += PAGE
+    }
+
+    const todaysCashByDate = new Map<string, number>()
+    let totalTodaysCash = 0
+    for (const row of reportCashRows) {
+      const v = getTodaysCash(row)
+      totalTodaysCash += v
+      const d = row.for_date?.slice(0, 10) ?? ''
+      if (!d) continue
+      todaysCashByDate.set(d, (todaysCashByDate.get(d) || 0) + v)
+    }
+
     // Calculate total withdrawals from daily data
     const totalWithdrawals = dailyAnalyticsData?.reduce((sum: number, day: { withdrawals: number }) => sum + (Number(day.withdrawals) || 0), 0) || 0
 
@@ -111,6 +164,7 @@ export async function POST(request: NextRequest) {
     const averageDailyWithdrawals = totalWithdrawals / daysWithData
     const averageDailyGrossRevenue = totalGrossRevenue / daysWithData
     const averageDailyNetRevenue = totalNetRevenue / daysWithData
+    const averageDailyTodaysCash = totalTodaysCash / daysWithData
 
     // Prepare daily data for charts
     const dailyDataMap = new Map<string, {
@@ -122,6 +176,7 @@ export async function POST(request: NextRequest) {
       loss: number
       gross_revenue: number
       net_revenue: number
+      todays_cash: number
     }>()
 
     // Initialize daily data map with all dates in range
@@ -137,7 +192,8 @@ export async function POST(request: NextRequest) {
         voids: 0,
         loss: 0,
         gross_revenue: 0,
-        net_revenue: 0
+        net_revenue: 0,
+        todays_cash: 0
       })
       currentDate.setDate(currentDate.getDate() + 1)
     }
@@ -157,6 +213,13 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    todaysCashByDate.forEach((amount, dateStr) => {
+      const dayData = dailyDataMap.get(dateStr)
+      if (dayData) {
+        dayData.todays_cash = amount
+      }
+    })
+
     const dailyData = Array.from(dailyDataMap.values()).sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     )
@@ -173,6 +236,8 @@ export async function POST(request: NextRequest) {
       totalNetRevenue,
       averageDailyGrossRevenue,
       averageDailyNetRevenue,
+      totalTodaysCash,
+      averageDailyTodaysCash,
       totalReports,
       approvedReports: approvedReportsCount,
       pendingReports,

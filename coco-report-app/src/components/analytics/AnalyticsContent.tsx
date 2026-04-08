@@ -28,6 +28,9 @@ interface AnalyticsData {
   totalVoids: number
   totalGrossRevenue: number
   totalNetRevenue: number
+  /** Sum of Cash + Flavor + Cash Deposits + Representacja 2 across reports in range */
+  totalTodaysCash?: number
+  averageDailyTodaysCash?: number
   totalReports: number
   approvedReports: number
   pendingReports: number
@@ -36,8 +39,11 @@ interface AnalyticsData {
     gross_sales: number
     withdrawals: number
     voids: number
+    loss?: number
+    tips?: number
     gross_revenue: number
     net_revenue: number
+    todays_cash?: number
   }>
 }
 
@@ -227,7 +233,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
   }, [])
 
   // Smart data aggregation function
-  const aggregateData = useCallback((data: Array<{ date: string; gross_sales: number; tips: number; voids: number; loss: number; withdrawals: number }>, level: string) => {
+  const aggregateData = useCallback((data: Array<{ date: string; gross_sales: number; tips: number; voids: number; loss: number; withdrawals: number; todays_cash?: number }>, level: string) => {
     if (level === 'raw' || data.length <= 100) return data
 
     const grouped = new Map()
@@ -262,6 +268,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
           voids: 0,
           loss: 0,
           withdrawals: 0,
+          todays_cash: 0,
           count: 0
         })
       }
@@ -272,6 +279,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
       group.voids += Number(item.voids) || 0
       group.loss += Number(item.loss) || 0
       group.withdrawals += Number(item.withdrawals) || 0
+      group.todays_cash += Number(item.todays_cash) || 0
       group.count += 1
     })
 
@@ -366,6 +374,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
       { name: 'Gross Revenue', value: analyticsData.totalGrossRevenue, color: '#10b981' },
       { name: 'Net Revenue', value: analyticsData.totalNetRevenue, color: '#3b82f6' },
       { name: 'Sales', value: analyticsData.totalGrossSales, color: '#8b5cf6' },
+      { name: "Today's cash", value: analyticsData.totalTodaysCash ?? 0, color: '#059669' },
       { name: 'Withdrawals', value: analyticsData.totalWithdrawals, color: '#ef4444' },
     ].filter(item => item.value > 0)
   }
@@ -404,8 +413,8 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
             <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {[...Array(4)].map((_, i) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
+              {[...Array(5)].map((_, i) => (
                 <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
               ))}
             </div>
@@ -548,7 +557,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
         {analyticsData && (
           <>
             {/* Key Metrics - All in One Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
               <div className="bg-white overflow-hidden shadow rounded-lg">
                 <div className="p-5">
                   <div className="flex items-center">
@@ -623,6 +632,26 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                       <dl>
                         <dt className="text-sm font-medium text-gray-500 truncate">Total Net Revenue</dt>
                         <dd className="text-lg font-medium text-gray-900">{formatCurrency(analyticsData.totalNetRevenue)}</dd>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white overflow-hidden shadow rounded-lg">
+                <div className="p-5">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-teal-600 rounded-md flex items-center justify-center">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt className="text-sm font-medium text-gray-500 truncate">Total Today&apos;s cash</dt>
+                        <dd className="text-lg font-medium text-gray-900">{formatCurrency(analyticsData.totalTodaysCash ?? 0)}</dd>
                       </dl>
                     </div>
                   </div>
@@ -760,6 +789,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                       <Bar dataKey="gross_revenue" fill="#10b981" name="Gross Revenue" />
                       <Bar dataKey="net_revenue" fill="#3b82f6" name="Net Revenue" />
                       <Bar dataKey="gross_sales" fill="#8b5cf6" name="Sales" />
+                      <Bar dataKey="todays_cash" fill="#059669" name="Today's cash" />
                       <Bar dataKey="tips" fill="#f59e0b" name="Tips" />
                       <Bar dataKey="withdrawals" fill="#ef4444" name="Withdrawals" />
                       {isVirtualized && <Brush dataKey="date" height={30} />}
@@ -811,6 +841,14 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                         strokeWidth={2}
                         name="Sales"
                         dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 3 }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="todays_cash" 
+                        stroke="#059669" 
+                        strokeWidth={2}
+                        name="Today's cash"
+                        dot={{ fill: '#059669', strokeWidth: 2, r: 3 }}
                       />
                       <Line 
                         type="monotone" 
