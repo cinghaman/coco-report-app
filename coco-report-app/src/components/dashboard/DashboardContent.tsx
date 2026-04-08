@@ -33,6 +33,9 @@ export default function DashboardContent({ user }: DashboardContentProps) {
   const [totalPages, setTotalPages] = useState(0)
   const reportsPerPage = 10
   const canSeeCashReports = user.role === 'admin' || user.role === 'owner'
+  /** Admin and owner see all venues / all daily rows; staff are scoped to venue_ids */
+  const canAccessAllVenues = user.role === 'admin' || user.role === 'owner'
+  const canDeleteDailyReports = canSeeCashReports
   const META_LIMIT = 2000
 
   // Delete confirmation state
@@ -63,9 +66,9 @@ export default function DashboardContent({ user }: DashboardContentProps) {
       const hiddenVenueIds =
         allVenuesData?.filter(isHiddenFromDashboard).map((v) => v.id) ?? []
 
-      // Filter venues based on user access
-      const accessibleVenues = allVenuesData?.filter(venue => 
-        user.role === 'admin' || user.venue_ids.includes(venue.id)
+      const accessibleVenues = allVenuesData?.filter(
+        (venue) =>
+          canAccessAllVenues || user.venue_ids.includes(venue.id)
       ) || []
 
       const visibleVenues = accessibleVenues.filter((v) => !isHiddenFromDashboard(v))
@@ -81,20 +84,6 @@ export default function DashboardContent({ user }: DashboardContentProps) {
       }
 
       // --- Merged daily + cash activity (date desc), then paginate ---
-      let dailyMetaQuery = supabase
-        .from('daily_reports')
-        .select('id, for_date, created_at')
-        .order('for_date', { ascending: false })
-        .limit(META_LIMIT)
-
-      if (user.role !== 'admin') {
-        dailyMetaQuery = dailyMetaQuery.in('venue_id', user.venue_ids)
-      }
-      dailyMetaQuery = excludeHiddenVenues(dailyMetaQuery)
-
-      const { data: dailyMeta, error: dailyMetaError } = await dailyMetaQuery
-      if (dailyMetaError) throw dailyMetaError
-
       type MetaRow = {
         kind: 'daily' | 'cash'
         id: string
@@ -102,12 +91,30 @@ export default function DashboardContent({ user }: DashboardContentProps) {
         created_at: string | null
       }
 
-      const dailyPart: MetaRow[] = (dailyMeta || []).map((r) => ({
-        kind: 'daily',
-        id: r.id,
-        for_date: r.for_date,
-        created_at: r.created_at ?? null,
-      }))
+      let dailyPart: MetaRow[] = []
+
+      if (canAccessAllVenues || (user.venue_ids && user.venue_ids.length > 0)) {
+        let dailyMetaQuery = supabase
+          .from('daily_reports')
+          .select('id, for_date, created_at')
+          .order('for_date', { ascending: false })
+          .limit(META_LIMIT)
+
+        if (!canAccessAllVenues) {
+          dailyMetaQuery = dailyMetaQuery.in('venue_id', user.venue_ids)
+        }
+        dailyMetaQuery = excludeHiddenVenues(dailyMetaQuery)
+
+        const { data: dailyMeta, error: dailyMetaError } = await dailyMetaQuery
+        if (dailyMetaError) throw dailyMetaError
+
+        dailyPart = (dailyMeta || []).map((r) => ({
+          kind: 'daily' as const,
+          id: r.id,
+          for_date: r.for_date,
+          created_at: r.created_at ?? null,
+        }))
+      }
 
       let cashPart: MetaRow[] = []
       if (canSeeCashReports) {
@@ -132,10 +139,17 @@ export default function DashboardContent({ user }: DashboardContentProps) {
       })
 
       const totalItems = combined.length
+      const tp = totalItems === 0 ? 0 : Math.ceil(totalItems / reportsPerPage)
       setTotalReports(totalItems)
-      setTotalPages(totalItems === 0 ? 0 : Math.ceil(totalItems / reportsPerPage))
+      setTotalPages(tp)
 
-      const start = (currentPage - 1) * reportsPerPage
+      const effectivePage =
+        tp === 0 ? 1 : Math.min(Math.max(1, currentPage), tp)
+      if (effectivePage !== currentPage) {
+        setCurrentPage(effectivePage)
+      }
+
+      const start = (effectivePage - 1) * reportsPerPage
       const slice = combined.slice(start, start + reportsPerPage)
 
       const dailyIds = slice.filter((s) => s.kind === 'daily').map((s) => s.id)
@@ -227,7 +241,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
     } finally {
       setLoading(false)
     }
-  }, [user.role, user.venue_ids, currentPage, canSeeCashReports])
+  }, [user.role, user.venue_ids, currentPage, canSeeCashReports, canAccessAllVenues])
 
   useEffect(() => {
     fetchDashboardData()
@@ -350,8 +364,8 @@ export default function DashboardContent({ user }: DashboardContentProps) {
         </div>
       </div>
 
-      {/* Venue Sales Cards - Admin only */}
-      {user.role === 'admin' && (
+      {/* Venue sales cards — full org view (admin + owner) */}
+      {canAccessAllVenues && (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           {venues.map((venue) => {
             const stats = venueStats[venue.id] || { totalReports: 0, approvedReports: 0, totalGrossRevenue: 0, totalNetRevenue: 0 }
@@ -395,7 +409,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
             {canSeeCashReports
               ? 'Daily (EOD) and cash reports, newest first. Open a row to view or edit.'
-              : user.role === 'admin'
+              : canAccessAllVenues
                 ? 'Latest daily reports from all venues'
                 : 'Latest daily reports from your assigned venues'}
           </p>
@@ -464,7 +478,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                               {formatCurrency(getTodaysCash(row.report))} today&apos;s cash
                             </div>
                           </div>
-                          {user.role === 'admin' && (
+                          {canDeleteDailyReports && (
                             <button
                               onClick={(e) => handleDeleteClick(e, row.report.id, formatDate(row.report.for_date))}
                               className="flex-shrink-0 p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"

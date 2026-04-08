@@ -104,8 +104,8 @@ export default function CashReportListPage() {
               <p className="font-medium">Could not load reports</p>
               <p className="mt-1">{loadError}</p>
               <p className="mt-2 text-xs text-amber-800">
-                If tables are missing, run <code className="bg-amber-100 px-1 rounded">supabase/cash_reports.sql</code>{' '}
-                in the Supabase SQL editor.
+                If tables are missing, create <code className="bg-amber-100 px-1 rounded">cash_reports</code> and{' '}
+                <code className="bg-amber-100 px-1 rounded">cash_report_lines</code> with RLS in the Supabase SQL editor.
               </p>
             </div>
           )}

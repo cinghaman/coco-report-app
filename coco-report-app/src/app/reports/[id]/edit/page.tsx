@@ -64,9 +64,11 @@ export default function ReportEditPage({ params }: ReportEditPageProps) {
         return
       }
 
-      // Check if user can edit this report
-      const canEdit = userProfile.role === 'admin' || 
-                     (reportData.created_by === session.user.id && reportData.status === 'draft')
+      // Admins and owners can edit any report; staff only their own drafts
+      const canEdit =
+        userProfile.role === 'admin' ||
+        userProfile.role === 'owner' ||
+        (reportData.created_by === session.user.id && reportData.status === 'draft')
       
       if (!canEdit) {
         window.location.href = '/dashboard'

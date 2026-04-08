@@ -178,9 +178,11 @@ export default function EODForm({ user, initialData }: EODFormProps) {
 
       if (error) throw error
 
-      // Filter venues based on user access
-      const accessibleVenues = data?.filter(venue =>
-        user.role === 'admin' || user.venue_ids.includes(venue.id)
+      const accessibleVenues = data?.filter(
+        (venue) =>
+          user.role === 'admin' ||
+          user.role === 'owner' ||
+          user.venue_ids.includes(venue.id)
       ) || []
 
       setVenues(accessibleVenues)
