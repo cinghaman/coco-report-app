@@ -484,6 +484,30 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
         </div>
         <div className="border-t border-gray-200 p-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* Opening vs closing cash (stored on report) */}
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg sm:col-span-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <div className="text-sm font-medium text-slate-700 mb-1">Opening cash</div>
+                  <div className="text-xl font-bold text-slate-900 tabular-nums">
+                    {formatCurrency(report.cash_previous_day ?? 0)}
+                  </div>
+                  <div className="text-xs text-slate-600 mt-1">
+                    Brought forward from the previous day.
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-emerald-800 mb-1">Closing cash</div>
+                  <div className="text-xl font-bold text-emerald-900 tabular-nums">
+                    {formatCurrency(report.calculated_cash_expected ?? 0)}
+                  </div>
+                  <div className="text-xs text-emerald-700 mt-1">
+                    Expected cash at close (stored on this report).
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Total Service */}
             <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
               <div className="text-sm font-medium text-purple-700 mb-1">Total Service</div>

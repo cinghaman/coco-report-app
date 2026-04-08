@@ -1,10 +1,15 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { User, CashReportLine } from '@/lib/supabase'
-import { closingCash, fetchOpeningCashForNewReport, resolveCocoLoungeVenueId } from '@/lib/cash-report'
+import {
+  closingCash,
+  fetchOpeningCashForNewReport,
+  netFromLines,
+  resolveCocoLoungeVenueId,
+} from '@/lib/cash-report'
 
 export type LineDraft = {
   id: string
@@ -31,6 +36,14 @@ function newLine(): LineDraft {
 
 const formatMoney = (n: number) =>
   new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(n)
+
+/** Parse income/expense field; supports comma decimals; empty → 0 */
+function parseMoneyInput(raw: string): number {
+  const t = raw.trim().replace(',', '.')
+  if (t === '' || t === '-' || t === '.' || t === '-.') return 0
+  const n = parseFloat(t)
+  return Number.isFinite(n) ? n : 0
+}
 
 function escapeHtml(s: string) {
   return s
@@ -146,10 +159,9 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
     }
   }, [supabase, isEdit, venueId, forDate])
 
-  const closing = useMemo(
-    () => closingCash(cashFromPrevious, lines),
-    [cashFromPrevious, lines]
-  )
+  // Recomputed every render so closing cash tracks every line edit immediately
+  const netMovement = netFromLines(lines)
+  const closing = closingCash(cashFromPrevious, lines)
 
   const updateLine = (id: string, patch: Partial<LineDraft>) => {
     setLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)))
@@ -369,16 +381,7 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-medium text-gray-900">Income &amp; expenses</h3>
-            <button
-              type="button"
-              onClick={addRow}
-              className="inline-flex items-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
-            >
-              Add row
-            </button>
-          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-3">Income &amp; expenses</h3>
 
           <div className="overflow-x-auto -mx-4 sm:mx-0 border border-gray-200 rounded-lg">
             <table className="min-w-full divide-y divide-gray-200">
@@ -427,10 +430,11 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
                         type="number"
                         step="0.01"
                         min="0"
+                        inputMode="decimal"
                         value={line.income || ''}
                         onChange={(e) =>
                           updateLine(line.id, {
-                            income: parseFloat(e.target.value) || 0,
+                            income: parseMoneyInput(e.target.value),
                           })
                         }
                         className="block w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-right text-gray-900 tabular-nums"
@@ -441,10 +445,11 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
                         type="number"
                         step="0.01"
                         min="0"
+                        inputMode="decimal"
                         value={line.expense || ''}
                         onChange={(e) =>
                           updateLine(line.id, {
-                            expense: parseFloat(e.target.value) || 0,
+                            expense: parseMoneyInput(e.target.value),
                           })
                         }
                         className="block w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-right text-gray-900 tabular-nums"
@@ -466,19 +471,48 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
               </tbody>
             </table>
           </div>
+
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={addRow}
+              className="inline-flex items-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
+            >
+              Add row
+            </button>
+          </div>
         </div>
 
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-emerald-900">Closing cash</div>
-            <p className="text-xs text-emerald-800 mt-1">
-              After the line items above: opening cash, plus all income minus all expenses in this
-              table.
-            </p>
-          </div>
-          <div className="text-xl font-bold text-emerald-900 tabular-nums shrink-0">
-            {formatMoney(closing)}
-          </div>
+        <div
+          className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-4 space-y-3"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <div className="text-sm font-medium text-emerald-900">Totals (live)</div>
+          <p className="text-xs text-emerald-800">
+            Closing cash updates as you edit income or expense on any row.
+          </p>
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between gap-4 tabular-nums">
+              <dt className="text-emerald-800">Opening cash</dt>
+              <dd className="font-medium text-emerald-950">{formatMoney(cashFromPrevious)}</dd>
+            </div>
+            <div className="flex justify-between gap-4 tabular-nums">
+              <dt className="text-emerald-800">Net from lines (Σ income − Σ expense)</dt>
+              <dd
+                className={`font-medium ${
+                  netMovement >= 0 ? 'text-emerald-800' : 'text-red-700'
+                }`}
+              >
+                {netMovement >= 0 ? '+' : '−'}
+                {formatMoney(Math.abs(netMovement))}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4 border-t border-emerald-200 pt-2 tabular-nums">
+              <dt className="font-semibold text-emerald-950">Closing cash</dt>
+              <dd className="text-lg font-bold text-emerald-950">{formatMoney(closing)}</dd>
+            </div>
+          </dl>
         </div>
 
         <div className="flex justify-end gap-3">
