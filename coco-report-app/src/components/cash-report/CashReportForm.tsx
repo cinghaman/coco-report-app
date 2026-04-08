@@ -270,7 +270,6 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
           <p><strong>Date:</strong> ${forDate}</p>
           <p><strong>${action} by:</strong> ${escapeHtml(user.display_name || user.email)}</p>
           <p><strong>Cash from previous day:</strong> ${formatMoney(cashFromPrevious)}</p>
-          <p><strong>Closing cash (after lines):</strong> ${formatMoney(closing)}</p>
 
           <h3>Line items</h3>
           <table style="border-collapse:collapse;width:100%;max-width:720px;">
@@ -285,6 +284,9 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
             </thead>
             <tbody>${rowsHtml}</tbody>
           </table>
+
+          <p style="margin-top:16px;"><strong>Closing cash:</strong> ${formatMoney(closing)}</p>
+          <p style="font-size:13px;color:#374151;">Opening cash plus total income minus total expenses from the line items.</p>
 
           <p style="margin-top:16px;font-size:14px;">
             <a href="https://coco-report-app.vercel.app/cash-report/${savedId}" target="_blank">View cash report</a>
@@ -364,16 +366,6 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
           <div className="mt-2 text-2xl font-semibold text-slate-900 tabular-nums">
             {formatMoney(cashFromPrevious)}
           </div>
-        </div>
-
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-4 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div className="text-sm font-medium text-emerald-900">Closing cash (after lines)</div>
-            <div className="text-xs text-emerald-800 mt-0.5">
-              Previous day cash + Σ income − Σ expense
-            </div>
-          </div>
-          <div className="text-xl font-bold text-emerald-900 tabular-nums">{formatMoney(closing)}</div>
         </div>
 
         <div>
@@ -473,6 +465,19 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-emerald-900">Closing cash</div>
+            <p className="text-xs text-emerald-800 mt-1">
+              After the line items above: opening cash, plus all income minus all expenses in this
+              table.
+            </p>
+          </div>
+          <div className="text-xl font-bold text-emerald-900 tabular-nums shrink-0">
+            {formatMoney(closing)}
           </div>
         </div>
 
