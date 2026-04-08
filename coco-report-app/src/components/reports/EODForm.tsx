@@ -576,9 +576,6 @@ export default function EODForm({ user, initialData }: EODFormProps) {
           const totalCardPayment = formData.card_1 + formData.card_2
           const totalIncomeFromDelivery = (formData.przelew + formData.glovo + formData.uber + formData.wolt + formData.pyszne + formData.bolt) * 0.70
           const todaysCash = getTodaysCash(formData)
-          const cashToShow =
-            formData.cash + formData.flavor + formData.cash_deposits + formData.total_sale_with_special_payment -
-            getTotalWithdrawals() - totalService
 
           const body = `
             <h2>EOD Report ${action}</h2>
@@ -599,8 +596,6 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Cash + Flavor + Cash Deposits + Representacja 2</td></tr>
               <tr><td style="padding: 6px 12px 6px 0;"><strong>Total Income from Delivery Apps</strong></td><td style="padding: 6px 0;">${fmt(totalIncomeFromDelivery)}</td></tr>
               <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">(Przelew + Glovo + Uber + Wolt + Pyszne + Bolt) × 0.70</td></tr>
-              <tr><td style="padding: 6px 12px 6px 0;"><strong>Cash to Show</strong></td><td style="padding: 6px 0;">${fmt(cashToShow)}</td></tr>
-              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Cash + Flavor + Cash Deposits + Representacja 2 − Withdrawals − Total Service</td></tr>
             </table>
 
             <h3>End of Day Sales</h3>
@@ -1270,20 +1265,6 @@ export default function EODForm({ user, initialData }: EODFormProps) {
                 </div>
                 <div className="text-xs text-orange-600 mt-1">
                   (Przelew + Glovo + Uber + Wolt + Pyszne + Bolt) × 0.70
-                </div>
-              </div>
-
-              {/* Cash to Show */}
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="text-sm font-medium text-amber-700 mb-1">Cash to Show</div>
-                <div className="text-xl font-bold text-amber-900">
-                  {formatCurrency(
-                    formData.cash + formData.flavor + formData.cash_deposits + formData.total_sale_with_special_payment -
-                    getTotalWithdrawals() - ((getTotalServiceKwotowy() + formData.service_10_percent) * 0.90)
-                  )}
-                </div>
-                <div className="text-xs text-amber-600 mt-1">
-                  Cash + Flavor + Cash Deposits + Representacja 2 − Withdrawals − Total Service
                 </div>
               </div>
             </div>

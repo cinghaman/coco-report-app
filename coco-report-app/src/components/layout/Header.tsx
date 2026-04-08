@@ -52,6 +52,14 @@ export default function Header({ user }: HeaderProps) {
             >
               New Report
             </Link>
+            {(user?.role === 'admin' || user?.role === 'owner') && (
+              <Link
+                href="/cash-report"
+                className="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                Cash Report
+              </Link>
+            )}
             {user?.role === 'admin' && (
               <Link
                 href="/analytics"
@@ -156,6 +164,14 @@ export default function Header({ user }: HeaderProps) {
               >
                 New Report
               </Link>
+              {(user?.role === 'admin' || user?.role === 'owner') && (
+                <Link
+                  href="/cash-report"
+                  className="text-gray-500 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
+                >
+                  Cash Report
+                </Link>
+              )}
               {user?.role === 'admin' && (
                 <Link
                   href="/analytics"

@@ -170,3 +170,23 @@ export interface AuditLog {
   changed_at?: string
   diff_json?: Record<string, unknown>
 }
+
+export interface CashReport {
+  id: string
+  venue_id: string
+  for_date: string
+  cash_from_previous_day: number
+  created_by?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface CashReportLine {
+  id: string
+  cash_report_id: string
+  sort_order: number
+  document_number: string | null
+  details: string | null
+  income: number
+  expense: number
+}
