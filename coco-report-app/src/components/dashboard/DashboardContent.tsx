@@ -2,17 +2,23 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { User, DailyReport, Venue } from '@/lib/supabase'
+import type { User, DailyReport, Venue, CashReport } from '@/lib/supabase'
 import { getTodaysCash } from '@/lib/todays-cash'
+import { isHiddenFromDashboard } from '@/lib/dashboard-venue-filter'
 import Link from 'next/link'
+
+export type DashboardActivityRow =
+  | { kind: 'daily'; report: DailyReport }
+  | { kind: 'cash'; report: CashReport }
 
 interface DashboardContentProps {
   user: User
 }
 
 export default function DashboardContent({ user }: DashboardContentProps) {
-  const [reports, setReports] = useState<DailyReport[]>([])
+  const [activityRows, setActivityRows] = useState<DashboardActivityRow[]>([])
   const [venues, setVenues] = useState<Venue[]>([])
+  const [venueCatalog, setVenueCatalog] = useState<Venue[]>([])
   const [loading, setLoading] = useState(true)
   const [venueStats, setVenueStats] = useState<Record<string, {
     totalReports: number
@@ -26,6 +32,8 @@ export default function DashboardContent({ user }: DashboardContentProps) {
   const [totalReports, setTotalReports] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const reportsPerPage = 10
+  const canSeeCashReports = user.role === 'admin' || user.role === 'owner'
+  const META_LIMIT = 2000
 
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; reportId: string | null; reportDate: string | null }>({
@@ -52,46 +60,118 @@ export default function DashboardContent({ user }: DashboardContentProps) {
 
       if (venuesError) throw venuesError
 
+      const hiddenVenueIds =
+        allVenuesData?.filter(isHiddenFromDashboard).map((v) => v.id) ?? []
+
       // Filter venues based on user access
       const accessibleVenues = allVenuesData?.filter(venue => 
         user.role === 'admin' || user.venue_ids.includes(venue.id)
       ) || []
 
-      setVenues(accessibleVenues)
+      const visibleVenues = accessibleVenues.filter((v) => !isHiddenFromDashboard(v))
+      setVenues(visibleVenues)
+      setVenueCatalog(allVenuesData || [])
 
-      // Get total count of reports for pagination
-      let countQuery = supabase
-        .from('daily_reports')
-        .select('*', { count: 'exact', head: true })
-
-      // If user is not admin, filter by their accessible venues
-      if (user.role !== 'admin') {
-        countQuery = countQuery.in('venue_id', user.venue_ids)
+      const excludeHiddenVenues = <T extends { neq: (c: string, v: string) => T }>(q: T) => {
+        let out = q
+        for (const id of hiddenVenueIds) {
+          out = out.neq('venue_id', id)
+        }
+        return out
       }
 
-      const { count, error: countError } = await countQuery
-
-      if (countError) throw countError
-      setTotalReports(count || 0)
-      setTotalPages(Math.ceil((count || 0) / reportsPerPage))
-
-      // Fetch paginated reports
-      const offset = (currentPage - 1) * reportsPerPage
-      let reportsQuery = supabase
+      // --- Merged daily + cash activity (date desc), then paginate ---
+      let dailyMetaQuery = supabase
         .from('daily_reports')
-        .select('*')
+        .select('id, for_date, created_at')
         .order('for_date', { ascending: false })
-        .range(offset, offset + reportsPerPage - 1)
+        .limit(META_LIMIT)
 
-      // If user is not admin, filter by their accessible venues
       if (user.role !== 'admin') {
-        reportsQuery = reportsQuery.in('venue_id', user.venue_ids)
+        dailyMetaQuery = dailyMetaQuery.in('venue_id', user.venue_ids)
+      }
+      dailyMetaQuery = excludeHiddenVenues(dailyMetaQuery)
+
+      const { data: dailyMeta, error: dailyMetaError } = await dailyMetaQuery
+      if (dailyMetaError) throw dailyMetaError
+
+      type MetaRow = {
+        kind: 'daily' | 'cash'
+        id: string
+        for_date: string
+        created_at: string | null
       }
 
-      const { data: reportsData, error: reportsError } = await reportsQuery
+      const dailyPart: MetaRow[] = (dailyMeta || []).map((r) => ({
+        kind: 'daily',
+        id: r.id,
+        for_date: r.for_date,
+        created_at: r.created_at ?? null,
+      }))
 
-      if (reportsError) throw reportsError
-      setReports(reportsData || [])
+      let cashPart: MetaRow[] = []
+      if (canSeeCashReports) {
+        const { data: cashMeta, error: cashMetaError } = await supabase
+          .from('cash_reports')
+          .select('id, for_date, created_at')
+          .order('for_date', { ascending: false })
+          .limit(META_LIMIT)
+        if (cashMetaError) throw cashMetaError
+        cashPart = (cashMeta || []).map((r) => ({
+          kind: 'cash',
+          id: r.id,
+          for_date: r.for_date,
+          created_at: r.created_at ?? null,
+        }))
+      }
+
+      const combined = [...dailyPart, ...cashPart].sort((a, b) => {
+        const byDate = b.for_date.localeCompare(a.for_date)
+        if (byDate !== 0) return byDate
+        return (b.created_at || '').localeCompare(a.created_at || '')
+      })
+
+      const totalItems = combined.length
+      setTotalReports(totalItems)
+      setTotalPages(totalItems === 0 ? 0 : Math.ceil(totalItems / reportsPerPage))
+
+      const start = (currentPage - 1) * reportsPerPage
+      const slice = combined.slice(start, start + reportsPerPage)
+
+      const dailyIds = slice.filter((s) => s.kind === 'daily').map((s) => s.id)
+      const cashIds = slice.filter((s) => s.kind === 'cash').map((s) => s.id)
+
+      const dailyById = new Map<string, DailyReport>()
+      if (dailyIds.length > 0) {
+        const { data: dailyFull, error: dailyFullError } = await supabase
+          .from('daily_reports')
+          .select('*')
+          .in('id', dailyIds)
+        if (dailyFullError) throw dailyFullError
+        for (const r of dailyFull || []) dailyById.set(r.id, r as DailyReport)
+      }
+
+      const cashById = new Map<string, CashReport>()
+      if (cashIds.length > 0) {
+        const { data: cashFull, error: cashFullError } = await supabase
+          .from('cash_reports')
+          .select('*')
+          .in('id', cashIds)
+        if (cashFullError) throw cashFullError
+        for (const r of cashFull || []) cashById.set(r.id, r as CashReport)
+      }
+
+      const rows: DashboardActivityRow[] = []
+      for (const s of slice) {
+        if (s.kind === 'daily') {
+          const report = dailyById.get(s.id)
+          if (report) rows.push({ kind: 'daily', report })
+        } else {
+          const report = cashById.get(s.id)
+          if (report) rows.push({ kind: 'cash', report })
+        }
+      }
+      setActivityRows(rows)
 
       // Calculate venue-specific stats using database aggregation for better performance
       const venueStatsMap: Record<string, {
@@ -102,7 +182,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
       }> = {}
 
       // Use database aggregation for venue stats instead of fetching all reports
-      for (const venue of accessibleVenues) {
+      for (const venue of visibleVenues) {
         // Get count of total reports for this venue
         const { count: totalReports, error: totalError } = await supabase
           .from('daily_reports')
@@ -147,7 +227,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
     } finally {
       setLoading(false)
     }
-  }, [user.role, user.venue_ids, currentPage])
+  }, [user.role, user.venue_ids, currentPage, canSeeCashReports])
 
   useEffect(() => {
     fetchDashboardData()
@@ -243,7 +323,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="md:flex md:items-center md:justify-between">
+      <div className="md:flex md:items-center md:justify-between gap-4">
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
             Dashboard
@@ -251,6 +331,22 @@ export default function DashboardContent({ user }: DashboardContentProps) {
           <p className="mt-1 text-sm text-gray-500">
             Welcome back, {user.display_name || user.email}
           </p>
+        </div>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <Link
+            href="/reports/new"
+            className="inline-flex justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
+          >
+            New daily report
+          </Link>
+          {canSeeCashReports && (
+            <Link
+              href="/cash-report/new"
+              className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              New cash report
+            </Link>
+          )}
         </div>
       </div>
 
@@ -292,86 +388,131 @@ export default function DashboardContent({ user }: DashboardContentProps) {
         </div>
       )}
 
-      {/* Recent Reports */}
+      {/* Recent activity: EOD (daily) + cash reports, newest first */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <div className="px-4 py-5 sm:px-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">Recent Reports</h3>
+          <h3 className="text-lg leading-6 font-medium text-gray-900">Recent activity</h3>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
-            {user.role === 'admin' 
-              ? 'Latest daily reports from all venues' 
-              : 'Latest daily reports from your assigned venues'
-            }
+            {canSeeCashReports
+              ? 'Daily (EOD) and cash reports, newest first. Open a row to view or edit.'
+              : user.role === 'admin'
+                ? 'Latest daily reports from all venues'
+                : 'Latest daily reports from your assigned venues'}
           </p>
         </div>
         <ul className="divide-y divide-gray-200">
-          {reports.length === 0 ? (
+          {activityRows.length === 0 ? (
             <li className="px-4 py-5 sm:px-6">
               <div className="text-center text-gray-500">
                 <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No reports</h3>
-                <p className="mt-1 text-sm text-gray-500">Get started by creating a new report.</p>
-                <div className="mt-6">
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No reports yet</h3>
+                <p className="mt-1 text-sm text-gray-500">Create a daily EOD report or a cash report.</p>
+                <div className="mt-6 flex flex-wrap justify-center gap-3">
                   <Link
                     href="/reports/new"
                     className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-emerald-600 hover:bg-emerald-700"
                   >
-                    New Report
+                    New daily report
                   </Link>
+                  {canSeeCashReports && (
+                    <Link
+                      href="/cash-report/new"
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                      New cash report
+                    </Link>
+                  )}
                 </div>
               </div>
             </li>
           ) : (
-            reports.map((report) => (
-              <li key={report.id} className="relative">
-                <Link href={`/reports/${report.id}`} className="block hover:bg-gray-50">
-                  <div className="px-4 py-4 sm:px-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center flex-1">
-                        <div className="flex-shrink-0">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(report.status)}`}>
-                            {report.status}
-                          </span>
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {formatDate(report.for_date)}
+            activityRows.map((row) =>
+              row.kind === 'daily' ? (
+                <li key={`d-${row.report.id}`} className="relative">
+                  <Link href={`/reports/${row.report.id}`} className="block hover:bg-gray-50">
+                    <div className="px-4 py-4 sm:px-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center flex-1 min-w-0">
+                          <div className="flex-shrink-0 flex flex-wrap items-center gap-1.5">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
+                              Daily (EOD)
+                            </span>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(row.report.status)}`}>
+                              {row.report.status}
+                            </span>
                           </div>
-                          <div className="text-sm text-gray-500">
-                            {venues.find(v => v.id === report.venue_id)?.name || 'Unknown Venue'}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <div className="text-sm font-medium text-gray-900">
-                            {formatCurrency(report.gross_revenue || 0)} gross
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {formatCurrency(report.net_revenue || 0)} net
-                          </div>
-                          <div className="text-xs text-gray-400">
-                            {formatCurrency(getTodaysCash(report))} cash
+                          <div className="ml-4 min-w-0">
+                            <div className="text-sm font-medium text-gray-900">
+                              {formatDate(row.report.for_date)}
+                            </div>
+                            <div className="text-sm text-gray-500 truncate">
+                              {venues.find((v) => v.id === row.report.venue_id)?.name || 'Unknown Venue'}
+                            </div>
                           </div>
                         </div>
-                        {user.role === 'admin' && (
-                          <button
-                            onClick={(e) => handleDeleteClick(e, report.id, formatDate(report.for_date))}
-                            className="flex-shrink-0 p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
-                            title="Delete report"
-                          >
-                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        )}
+                        <div className="flex items-center gap-4 flex-shrink-0">
+                          <div className="text-right">
+                            <div className="text-sm font-medium text-gray-900">
+                              {formatCurrency(row.report.gross_revenue || 0)} gross
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {formatCurrency(row.report.net_revenue || 0)} net
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {formatCurrency(getTodaysCash(row.report))} today&apos;s cash
+                            </div>
+                          </div>
+                          {user.role === 'admin' && (
+                            <button
+                              onClick={(e) => handleDeleteClick(e, row.report.id, formatDate(row.report.for_date))}
+                              className="flex-shrink-0 p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
+                              title="Delete report"
+                            >
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
-              </li>
-            ))
+                  </Link>
+                </li>
+              ) : (
+                <li key={`c-${row.report.id}`} className="relative">
+                  <Link href={`/cash-report/${row.report.id}`} className="block hover:bg-gray-50">
+                    <div className="px-4 py-4 sm:px-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center flex-1 min-w-0">
+                          <div className="flex-shrink-0">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-900">
+                              Cash report
+                            </span>
+                          </div>
+                          <div className="ml-4 min-w-0">
+                            <div className="text-sm font-medium text-gray-900">
+                              {formatDate(row.report.for_date)}
+                            </div>
+                            <div className="text-sm text-gray-500 truncate">
+                              {venueCatalog.find((v) => v.id === row.report.venue_id)?.name || 'Venue'}{' '}
+                              <span className="text-emerald-600">· Open to edit</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-sm text-gray-500">Opening cash</div>
+                          <div className="text-sm font-semibold text-gray-900 tabular-nums">
+                            {formatCurrency(Number(row.report.cash_from_previous_day) || 0)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </li>
+              )
+            )
           )}
         </ul>
       </div>
