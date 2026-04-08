@@ -38,11 +38,17 @@ export default function DashboardContent({ user }: DashboardContentProps) {
   const canDeleteDailyReports = canSeeCashReports
   const META_LIMIT = 2000
 
-  // Delete confirmation state
-  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; reportId: string | null; reportDate: string | null }>({
+  // Delete confirmation state (daily vs cash report APIs)
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    show: boolean
+    reportId: string | null
+    reportDate: string | null
+    kind: 'daily' | 'cash' | null
+  }>({
     show: false,
     reportId: null,
-    reportDate: null
+    reportDate: null,
+    kind: null,
   })
   const [deleting, setDeleting] = useState(false)
 
@@ -287,19 +293,28 @@ export default function DashboardContent({ user }: DashboardContentProps) {
     }
   }
 
-  const handleDeleteClick = (e: React.MouseEvent, reportId: string, reportDate: string) => {
+  const handleDeleteClick = (
+    e: React.MouseEvent,
+    reportId: string,
+    reportDate: string,
+    kind: 'daily' | 'cash'
+  ) => {
     e.preventDefault()
     e.stopPropagation()
-    setDeleteConfirm({ show: true, reportId, reportDate })
+    setDeleteConfirm({ show: true, reportId, reportDate, kind })
   }
 
   const handleDeleteConfirm = async () => {
-    if (!deleteConfirm.reportId) return
+    if (!deleteConfirm.reportId || !deleteConfirm.kind) return
 
     try {
       setDeleting(true)
-      const response = await fetch(`/api/reports/${deleteConfirm.reportId}`, {
-        method: 'DELETE'
+      const url =
+        deleteConfirm.kind === 'cash'
+          ? `/api/cash-reports/${deleteConfirm.reportId}`
+          : `/api/reports/${deleteConfirm.reportId}`
+      const response = await fetch(url, {
+        method: 'DELETE',
       })
 
       if (!response.ok) {
@@ -307,13 +322,11 @@ export default function DashboardContent({ user }: DashboardContentProps) {
         throw new Error(error.error || 'Failed to delete report')
       }
 
-      // Email notification is now sent server-side in the DELETE endpoint
+      // Email notification is sent server-side in the DELETE endpoint
 
-      // Refresh the reports list
       await fetchDashboardData()
-      
-      // Close confirmation dialog
-      setDeleteConfirm({ show: false, reportId: null, reportDate: null })
+
+      setDeleteConfirm({ show: false, reportId: null, reportDate: null, kind: null })
     } catch (error) {
       console.error('Error deleting report:', error)
       alert(error instanceof Error ? error.message : 'Failed to delete report')
@@ -323,7 +336,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
   }
 
   const handleDeleteCancel = () => {
-    setDeleteConfirm({ show: false, reportId: null, reportDate: null })
+    setDeleteConfirm({ show: false, reportId: null, reportDate: null, kind: null })
   }
 
   if (loading) {
@@ -480,7 +493,9 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                           </div>
                           {canDeleteDailyReports && (
                             <button
-                              onClick={(e) => handleDeleteClick(e, row.report.id, formatDate(row.report.for_date))}
+                              onClick={(e) =>
+                                handleDeleteClick(e, row.report.id, formatDate(row.report.for_date), 'daily')
+                              }
                               className="flex-shrink-0 p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
                               title="Delete report"
                             >
@@ -496,9 +511,12 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                 </li>
               ) : (
                 <li key={`c-${row.report.id}`} className="relative">
-                  <Link href={`/cash-report/${row.report.id}`} className="block hover:bg-gray-50">
-                    <div className="px-4 py-4 sm:px-6">
-                      <div className="flex items-center justify-between">
+                  <div className="flex items-stretch">
+                    <Link
+                      href={`/cash-report/${row.report.id}`}
+                      className="block hover:bg-gray-50 flex-1 min-w-0 px-4 py-4 sm:px-6"
+                    >
+                      <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center flex-1 min-w-0">
                           <div className="flex-shrink-0">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-900">
@@ -522,8 +540,32 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </Link>
+                    </Link>
+                    {canDeleteDailyReports && (
+                      <button
+                        type="button"
+                        onClick={(e) =>
+                          handleDeleteClick(
+                            e,
+                            row.report.id,
+                            formatDate(row.report.for_date),
+                            'cash'
+                          )
+                        }
+                        className="flex-shrink-0 self-center p-2 mr-2 sm:mr-4 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
+                        title="Delete cash report"
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </li>
               )
             )
@@ -631,11 +673,15 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mt-4 text-center">Delete Report</h3>
+              <h3 className="text-lg font-medium text-gray-900 mt-4 text-center">
+                {deleteConfirm.kind === 'cash' ? 'Delete cash report' : 'Delete report'}
+              </h3>
               <div className="mt-2 px-7 py-3">
                 <p className="text-sm text-gray-500 text-center">
-                  Are you sure you want to delete the report for <strong>{deleteConfirm.reportDate}</strong>? 
-                  This action cannot be undone and will remove all associated data.
+                  Are you sure you want to delete{' '}
+                  {deleteConfirm.kind === 'cash' ? 'this cash report' : 'the report'} for{' '}
+                  <strong>{deleteConfirm.reportDate}</strong>? This cannot be undone
+                  {deleteConfirm.kind === 'cash' ? ' (all line items will be removed).' : '.'}
                 </p>
               </div>
               <div className="flex items-center justify-end gap-3 px-4 py-3">
