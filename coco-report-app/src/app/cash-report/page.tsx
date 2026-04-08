@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import type { User } from '@/lib/supabase'
 import Header from '@/components/layout/Header'
+import { lineNetByCashReportId } from '@/lib/cash-report'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(n)
@@ -15,6 +16,8 @@ type CashReportRow = {
   for_date: string
   cash_from_previous_day: number
   created_at: string
+  /** opening + Σ(income − expense) for lines; matches CashReportForm closing. */
+  closing_cash: number
 }
 
 export default function CashReportListPage() {
@@ -47,7 +50,28 @@ export default function CashReportListPage() {
       setLoadError(error.message)
       return
     }
-    setRows((data as CashReportRow[]) ?? [])
+    const list = (data ?? []) as Omit<CashReportRow, 'closing_cash'>[]
+    const ids = list.map((r) => r.id)
+    let netById = new Map<string, number>()
+    if (ids.length > 0) {
+      const { data: lineRows, error: le } = await supabase
+        .from('cash_report_lines')
+        .select('cash_report_id, income, expense')
+        .in('cash_report_id', ids)
+      if (le) {
+        setLoadError(le.message)
+        return
+      }
+      netById = lineNetByCashReportId(lineRows ?? [])
+    }
+    const enriched: CashReportRow[] = list.map((r) => {
+      const opening = Number(r.cash_from_previous_day) || 0
+      return {
+        ...r,
+        closing_cash: opening + (netById.get(r.id) ?? 0),
+      }
+    })
+    setRows(enriched)
   }, [])
 
   useEffect(() => {
@@ -163,11 +187,19 @@ export default function CashReportListPage() {
                         <p className="text-sm font-medium text-emerald-800">Coco Lounge</p>
                         <p className="text-sm text-gray-500">{formatRowDate(r.for_date)}</p>
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-sm text-gray-500">Opening cash</p>
-                        <p className="text-sm font-semibold text-gray-900 tabular-nums">
-                          {fmt(Number(r.cash_from_previous_day) || 0)}
-                        </p>
+                      <div className="text-right flex-shrink-0 flex gap-6 sm:gap-8 justify-end">
+                        <div>
+                          <p className="text-sm text-gray-500">Opening cash</p>
+                          <p className="text-sm font-semibold text-gray-900 tabular-nums">
+                            {fmt(Number(r.cash_from_previous_day) || 0)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Closing cash</p>
+                          <p className="text-sm font-semibold text-gray-900 tabular-nums">
+                            {fmt(r.closing_cash)}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </Link>

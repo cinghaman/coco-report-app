@@ -5,11 +5,12 @@ import { supabase } from '@/lib/supabase'
 import type { User, DailyReport, Venue, CashReport } from '@/lib/supabase'
 import { getTodaysCash } from '@/lib/todays-cash'
 import { isHiddenFromDashboard } from '@/lib/dashboard-venue-filter'
+import { lineNetByCashReportId } from '@/lib/cash-report'
 import Link from 'next/link'
 
 export type DashboardActivityRow =
   | { kind: 'daily'; report: DailyReport }
-  | { kind: 'cash'; report: CashReport }
+  | { kind: 'cash'; report: CashReport; closingCash: number }
 
 interface DashboardContentProps {
   user: User
@@ -181,6 +182,16 @@ export default function DashboardContent({ user }: DashboardContentProps) {
         for (const r of cashFull || []) cashById.set(r.id, r as CashReport)
       }
 
+      let cashLineNetById = new Map<string, number>()
+      if (cashIds.length > 0) {
+        const { data: cashLineRows, error: cashLinesError } = await supabase
+          .from('cash_report_lines')
+          .select('cash_report_id, income, expense')
+          .in('cash_report_id', cashIds)
+        if (cashLinesError) throw cashLinesError
+        cashLineNetById = lineNetByCashReportId(cashLineRows ?? [])
+      }
+
       const rows: DashboardActivityRow[] = []
       for (const s of slice) {
         if (s.kind === 'daily') {
@@ -188,7 +199,11 @@ export default function DashboardContent({ user }: DashboardContentProps) {
           if (report) rows.push({ kind: 'daily', report })
         } else {
           const report = cashById.get(s.id)
-          if (report) rows.push({ kind: 'cash', report })
+          if (report) {
+            const opening = Number(report.cash_from_previous_day) || 0
+            const closing = opening + (cashLineNetById.get(s.id) ?? 0)
+            rows.push({ kind: 'cash', report, closingCash: closing })
+          }
         }
       }
       setActivityRows(rows)
@@ -533,10 +548,18 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                             </div>
                           </div>
                         </div>
-                        <div className="text-right flex-shrink-0">
-                          <div className="text-sm text-gray-500">Opening cash</div>
-                          <div className="text-sm font-semibold text-gray-900 tabular-nums">
-                            {formatCurrency(Number(row.report.cash_from_previous_day) || 0)}
+                        <div className="text-right flex-shrink-0 flex gap-6 sm:gap-8">
+                          <div>
+                            <div className="text-sm text-gray-500">Opening cash</div>
+                            <div className="text-sm font-semibold text-gray-900 tabular-nums">
+                              {formatCurrency(Number(row.report.cash_from_previous_day) || 0)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-sm text-gray-500">Closing cash</div>
+                            <div className="text-sm font-semibold text-gray-900 tabular-nums">
+                              {formatCurrency(row.closingCash)}
+                            </div>
                           </div>
                         </div>
                       </div>

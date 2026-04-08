@@ -44,6 +44,25 @@ export function netFromLines(
   )
 }
 
+/**
+ * Sum of (income − expense) per `cash_report_id` from flat line rows (e.g. one Supabase query).
+ */
+export function lineNetByCashReportId(
+  lines: ReadonlyArray<{
+    cash_report_id: string
+    income?: number | null
+    expense?: number | null
+  }>
+): Map<string, number> {
+  const map = new Map<string, number>()
+  for (const l of lines) {
+    const id = l.cash_report_id
+    const delta = (Number(l.income) || 0) - (Number(l.expense) || 0)
+    map.set(id, (map.get(id) ?? 0) + delta)
+  }
+  return map
+}
+
 /** Closing balance for a report = opening + net from lines. */
 export function closingCash(
   cashFromPreviousDay: number,
