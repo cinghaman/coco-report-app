@@ -28,7 +28,7 @@ interface AnalyticsData {
   totalVoids: number
   totalGrossRevenue: number
   totalNetRevenue: number
-  /** Sum of Cash + Flavor + Cash Deposits + Representacja 2 across reports in range */
+  /** Sum of Cash + Flavor sold + Cash Deposits + Representacja 2 across reports in range */
   totalTodaysCash?: number
   averageDailyTodaysCash?: number
   totalReports: number

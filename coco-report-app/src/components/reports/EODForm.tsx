@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import type { User, Venue, DailyReport } from '@/lib/supabase'
+import type { User, Venue, DailyReport, ReportStatus } from '@/lib/supabase'
 import { getTodaysCash } from '@/lib/todays-cash'
 
 interface EODFormProps {
@@ -43,6 +43,47 @@ interface FormData {
   cash_previous_day: number
   calculated_cash_expected: number
   reconciliation_diff: number
+}
+
+/** Only columns that exist on `daily_reports` — avoids PostgREST 400s when extra keys slip into state. */
+function buildDailyReportSavePayload(
+  formData: FormData,
+  opts: {
+    status: ReportStatus
+    cashPreviousDay: number
+    drawer: number
+  }
+): Partial<DailyReport> {
+  return {
+    venue_id: formData.venue_id,
+    for_date: formData.for_date,
+    total_sale_gross: formData.total_sale_gross,
+    card_1: formData.card_1,
+    card_2: formData.card_2,
+    cash: formData.cash,
+    flavor: formData.flavor,
+    cash_deposits: formData.cash_deposits,
+    przelew: formData.przelew,
+    glovo: formData.glovo,
+    uber: formData.uber,
+    wolt: formData.wolt,
+    pyszne: formData.pyszne,
+    bolt: formData.bolt,
+    total_sale_with_special_payment: formData.total_sale_with_special_payment,
+    withdrawal: formData.withdrawal,
+    locker_withdrawal: formData.locker_withdrawal,
+    deposit: formData.deposit,
+    staff_cost: formData.staff_cost,
+    service_10_percent: formData.service_10_percent,
+    staff_spent: formData.staff_spent,
+    gross_revenue: formData.gross_revenue,
+    net_revenue: formData.net_revenue,
+    cash_previous_day: opts.cashPreviousDay,
+    calculated_cash_expected: formData.calculated_cash_expected,
+    reconciliation_diff: formData.reconciliation_diff,
+    drawer: opts.drawer,
+    status: opts.status,
+  }
 }
 
 export default function EODForm({ user, initialData }: EODFormProps) {
@@ -485,14 +526,11 @@ export default function EODForm({ user, initialData }: EODFormProps) {
         throw new Error('Supabase client not configured')
       }
 
-      const reportData: Partial<DailyReport> = {
-        ...formData,
+      const reportData: Partial<DailyReport> = buildDailyReportSavePayload(formData, {
+        status: status === 'submitted' ? 'approved' : (status as ReportStatus),
+        cashPreviousDay: cashPreviousDay,
         drawer: 0,
-        status: status === 'submitted' ? 'approved' : status, // Auto-approve submitted reports
-        cash_previous_day: cashPreviousDay,
-        gross_revenue: formData.gross_revenue,
-        net_revenue: formData.net_revenue,
-      }
+      })
 
       let data, error
 
@@ -584,7 +622,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
             <p><strong>${initialData ? 'Updated' : 'Created'} by:</strong> ${user.display_name || user.email}</p>
             <p><strong>Status:</strong> Submitted</p>
             <p><strong>Total Sales (Gross):</strong> ${fmt(formData.total_sale_gross)}</p>
-            <p style="font-size: 12px; color: #666; margin-top: -8px;">Card 1 + Card 2 + Cash + Flavor + Cash Deposits + Przelew + Glovo + Uber + Wolt + Pyszne + Bolt + Representacja 2</p>
+            <p style="font-size: 12px; color: #666; margin-top: -8px;">Card 1 + Card 2 + Cash + Flavor sold + Cash Deposits + Przelew + Glovo + Uber + Wolt + Pyszne + Bolt + Representacja 2</p>
 
             <h3>Mini Calculations</h3>
             <table style="border-collapse: collapse; margin-bottom: 16px;">
@@ -593,7 +631,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               <tr><td style="padding: 6px 12px 6px 0;"><strong>Total Card Payment</strong></td><td style="padding: 6px 0;">${fmt(totalCardPayment)}</td></tr>
               <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Card 1 + Card 2</td></tr>
               <tr><td style="padding: 6px 12px 6px 0;"><strong>Today's cash</strong></td><td style="padding: 6px 0;">${fmt(todaysCash)}</td></tr>
-              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Cash + Flavor + Cash Deposits + Representacja 2</td></tr>
+              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Cash + Flavor sold + Cash Deposits + Representacja 2</td></tr>
               <tr><td style="padding: 6px 12px 6px 0;"><strong>Total Income from Delivery Apps</strong></td><td style="padding: 6px 0;">${fmt(totalIncomeFromDelivery)}</td></tr>
               <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">(Przelew + Glovo + Uber + Wolt + Pyszne + Bolt) × 0.70</td></tr>
             </table>
@@ -601,7 +639,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
             <h3>End of Day Sales</h3>
             <table style="border-collapse: collapse; margin-bottom: 16px;">
               <tr><td style="padding: 6px 12px 6px 0;"><strong>Gross Revenue</strong></td><td style="padding: 6px 0;">${fmt(formData.gross_revenue)}</td></tr>
-              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Total Card Payment + Total Income from Delivery + Representacja 2 + Cash + Flavor + Cash Deposits</td></tr>
+              <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Total Card Payment + Total Income from Delivery + Representacja 2 + Cash + Flavor sold + Cash Deposits</td></tr>
               <tr><td style="padding: 6px 12px 6px 0;"><strong>Net Revenue</strong></td><td style="padding: 6px 0;">${fmt(formData.net_revenue)}</td></tr>
               <tr><td style="padding: 2px 12px 2px 0; font-size: 12px; color: #666;" colspan="2">Gross Revenue - Total Withdrawals - Total Service</td></tr>
             </table>
@@ -878,14 +916,14 @@ export default function EODForm({ user, initialData }: EODFormProps) {
                 <span className="text-sm font-medium text-emerald-800">Total Sales (Gross) - Auto Calculated:</span>
                 <span className="text-2xl font-bold text-emerald-900">{formatCurrency(formData.total_sale_gross)}</span>
               </div>
-              <p className="text-xs text-emerald-700 mt-1">Card 1 + Card 2 + Cash + Flavor + Cash Deposits + Przelew + Glovo + Uber + Wolt + Pyszne + Bolt + Representacja 2</p>
+              <p className="text-xs text-emerald-700 mt-1">Card 1 + Card 2 + Cash + Flavor sold + Cash Deposits + Przelew + Glovo + Uber + Wolt + Pyszne + Bolt + Representacja 2</p>
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {renderNumberInput('card_1', 'Card 1')}
               {renderNumberInput('card_2', 'Card 2')}
               {renderNumberInput('cash', 'Cash')}
-              {renderNumberInput('flavor', 'Flavor')}
+              {renderNumberInput('flavor', 'Flavor sold')}
               {renderNumberInput('cash_deposits', 'Cash Deposits')}
               {renderNumberInput('przelew', 'Przelew')}
               {renderNumberInput('glovo', 'Glovo')}
@@ -1251,7 +1289,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
                   {formatCurrency(getTodaysCash(formData))}
                 </div>
                 <div className="text-xs text-green-600 mt-1">
-                  Cash + Flavor + Cash Deposits + Representacja 2
+                  Cash + Flavor sold + Cash Deposits + Representacja 2
                 </div>
               </div>
 
@@ -1282,7 +1320,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
                   {formatCurrency(formData.gross_revenue)}
                 </div>
                 <div className="text-xs text-green-600 mt-1">
-                  Total Card Payment + Total Income from Delivery + Representacja 2 + Cash + Flavor + Cash Deposits
+                  Total Card Payment + Total Income from Delivery + Representacja 2 + Cash + Flavor sold + Cash Deposits
                 </div>
               </div>
 

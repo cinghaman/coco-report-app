@@ -49,41 +49,44 @@ serve(async (req) => {
       customFlat[`custom.${row.field_definitions.key}`] = row.value_text ?? "";
     }
 
-    // Compose CSV header order (minimal fixed; custom appended after)
+    // Must match columns on `daily_reports` + EOD `buildDailyReportSavePayload` (no legacy fields).
+    const v = report.venues as { name: string; slug: string };
     const base: Record<string, string | number | null> = {
+      report_id: report.id,
       date: report.for_date,
-      venue: report.venues.name,
+      venue: v.name,
+      venue_slug: v.slug,
       total_sale_gross: report.total_sale_gross,
       card_1: report.card_1,
       card_2: report.card_2,
       cash: report.cash,
+      flavor: report.flavor,
+      cash_deposits: report.cash_deposits,
       przelew: report.przelew,
       glovo: report.glovo,
       uber: report.uber,
       wolt: report.wolt,
       pyszne: report.pyszne,
       bolt: report.bolt,
-      tips_cash: report.tips_cash,
-      tips_card: report.tips_card,
+      total_sale_with_special_payment: report.total_sale_with_special_payment,
       withdrawal: report.withdrawal,
       locker_withdrawal: report.locker_withdrawal,
       deposit: report.deposit,
-      left_in_drawer: report.left_in_drawer,
-      cash_in_envelope_after_tips: report.cash_in_envelope_after_tips,
-      total_cash_in_locker: report.total_cash_in_locker,
-      voids: report.voids,
-      strata_loss: report.strata_loss,
-      serwis: report.serwis,
-      serwis_k: report.serwis_k,
-      company: report.company,
-      representation_note: report.representation_note,
-      representation_amount: report.representation_amount,
-      flavour: report.flavour,
+      staff_cost: report.staff_cost,
+      service_10_percent: report.service_10_percent,
+      staff_spent: report.staff_spent,
+      drawer: report.drawer,
+      gross_revenue: report.gross_revenue,
+      net_revenue: report.net_revenue,
       cash_previous_day: report.cash_previous_day,
       calculated_cash_expected: report.calculated_cash_expected,
       reconciliation_diff: report.reconciliation_diff,
       status: report.status,
-      approved_at: report.approved_at
+      created_by: report.created_by,
+      submitted_at: report.submitted_at,
+      approved_by: report.approved_by,
+      approved_at: report.approved_at,
+      locked_at: report.locked_at,
     };
 
     const row = { ...base, ...customFlat };

@@ -32,6 +32,14 @@ function newLine(): LineDraft {
 const formatMoney = (n: number) =>
   new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(n)
 
+function escapeHtml(s: string) {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
 export default function CashReportForm({ user, reportId }: CashReportFormProps) {
   const router = useRouter()
   const isEdit = Boolean(reportId)
@@ -171,6 +179,8 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
         updated_at: new Date().toISOString(),
       }
 
+      let savedId: string
+
       if (isEdit && reportId) {
         const { error: ue } = await supabase
           .from('cash_reports')
@@ -194,6 +204,7 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
         }))
         const { error: ie } = await supabase.from('cash_report_lines').insert(inserts)
         if (ie) throw ie
+        savedId = reportId
       } else {
         const { data: created, error: ce } = await supabase
           .from('cash_reports')
@@ -216,6 +227,83 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
         }))
         const { error: ie } = await supabase.from('cash_report_lines').insert(inserts)
         if (ie) throw ie
+        savedId = created.id
+      }
+
+      // Notify admins / owners (same distribution as EOD reports)
+      try {
+        const { data: adminUsers, error: adminError } = await supabase
+          .from('users')
+          .select('email, display_name, role')
+          .in('role', ['admin', 'owner'])
+
+        if (adminError) {
+          console.error('Cash report email: error fetching admin emails:', adminError)
+        }
+
+        const adminEmails = adminUsers?.map((u) => u.email).filter(Boolean) || []
+        const requiredAdminEmails = ['admin@thoughtbulb.dev', 'shetty.aneet@gmail.com']
+        const recipientEmails = [...new Set([...adminEmails, ...requiredAdminEmails])]
+        const to =
+          recipientEmails.length > 0 ? recipientEmails : requiredAdminEmails
+
+        const action = isEdit ? 'Updated' : 'Created'
+        const subject = `Cash Report ${action} - Coco Lounge - ${forDate}`
+        const closing = closingCash(cashFromPrevious, lines)
+
+        const rowsHtml = lines
+          .map(
+            (l, i) =>
+              `<tr>
+                <td style="padding:8px;border:1px solid #ddd;">${i + 1}</td>
+                <td style="padding:8px;border:1px solid #ddd;">${escapeHtml(l.document_number || '—')}</td>
+                <td style="padding:8px;border:1px solid #ddd;">${escapeHtml(l.details || '—')}</td>
+                <td style="padding:8px;border:1px solid #ddd;text-align:right;">${formatMoney(Number(l.income) || 0)}</td>
+                <td style="padding:8px;border:1px solid #ddd;text-align:right;">${formatMoney(Number(l.expense) || 0)}</td>
+              </tr>`
+          )
+          .join('')
+
+        const html = `
+          <h2>Cash Report ${action}</h2>
+          <p><strong>Venue:</strong> Coco Lounge</p>
+          <p><strong>Date:</strong> ${forDate}</p>
+          <p><strong>${action} by:</strong> ${escapeHtml(user.display_name || user.email)}</p>
+          <p><strong>Cash from previous day:</strong> ${formatMoney(cashFromPrevious)}</p>
+          <p><strong>Closing cash (after lines):</strong> ${formatMoney(closing)}</p>
+
+          <h3>Line items</h3>
+          <table style="border-collapse:collapse;width:100%;max-width:720px;">
+            <thead>
+              <tr style="background:#f3f4f6;">
+                <th style="padding:8px;border:1px solid #ddd;text-align:left;">#</th>
+                <th style="padding:8px;border:1px solid #ddd;text-align:left;">Document no.</th>
+                <th style="padding:8px;border:1px solid #ddd;text-align:left;">Details</th>
+                <th style="padding:8px;border:1px solid #ddd;text-align:right;">Income</th>
+                <th style="padding:8px;border:1px solid #ddd;text-align:right;">Expense</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+
+          <p style="margin-top:16px;font-size:14px;">
+            <a href="https://coco-report-app.vercel.app/cash-report/${savedId}" target="_blank">View cash report</a>
+          </p>
+        `
+
+        const emailResponse = await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to, subject, html }),
+        })
+        const emailResult = await emailResponse.json()
+        if (emailResponse.ok) {
+          console.log('Cash report email:', emailResult.message)
+        } else {
+          console.error('Cash report email failed:', emailResult)
+        }
+      } catch (emailErr) {
+        console.error('Cash report email error:', emailErr)
       }
 
       router.push('/cash-report')

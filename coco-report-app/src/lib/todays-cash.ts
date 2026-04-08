@@ -1,6 +1,6 @@
 import type { DailyReport } from '@/lib/supabase'
 
-/** Cash + Flavor + Cash Deposits + Representacja 2 — same for new and legacy stored rows. */
+/** Cash + Flavor sold + Cash Deposits + Representacja 2 — same for new and legacy stored rows. */
 export function getTodaysCash(
   report: Pick<
     DailyReport,

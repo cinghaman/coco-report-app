@@ -313,7 +313,7 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
               </dd>
             </div>
             <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Flavor</dt>
+              <dt className="text-sm font-medium text-gray-500">Flavor sold</dt>
               <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                 {formatCurrency(report.flavor || 0)}
               </dd>
@@ -513,7 +513,7 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
                 {formatCurrency(getTodaysCash(report))}
               </div>
               <div className="text-xs text-green-600 mt-1">
-                Cash + Flavor + Cash Deposits + Representacja 2
+                Cash + Flavor sold + Cash Deposits + Representacja 2
               </div>
             </div>
 
@@ -550,7 +550,7 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
                 {formatCurrency(report.gross_revenue || 0)}
               </div>
               <div className="text-xs text-green-600 mt-1">
-                Total Card Payment + Total Income from Delivery + Representacja 2 + Cash + Flavor + Cash Deposits
+                Total Card Payment + Total Income from Delivery + Representacja 2 + Cash + Flavor sold + Cash Deposits
               </div>
             </div>
 
