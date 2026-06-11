@@ -317,32 +317,39 @@ export default function UserManagement({ user }: UserManagementProps) {
               </div>
             </div>
 
-            {newUser.role === 'staff' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Venue Access
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {venues.map((venue) => (
-                    <label key={venue.id} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={newUser.venue_ids.includes(venue.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setNewUser({ ...newUser, venue_ids: [...newUser.venue_ids, venue.id] })
-                          } else {
-                            setNewUser({ ...newUser, venue_ids: newUser.venue_ids.filter(id => id !== venue.id) })
-                          }
-                        }}
-                        className="rounded border-gray-300 text-emerald-600 shadow-sm focus:border-emerald-300 focus:ring focus:ring-emerald-200 focus:ring-opacity-50"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">{venue.name}</span>
-                    </label>
-                  ))}
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Assigned locations
+                {newUser.role === 'staff' ? ' (required)' : ' (email notifications)'}
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                {newUser.role === 'staff'
+                  ? 'Staff can only view and submit reports for selected venues.'
+                  : 'Admins still see all venues in the app; selected locations control which report emails they receive.'}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {venues.map((venue) => (
+                  <label key={venue.id} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={newUser.venue_ids.includes(venue.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setNewUser({ ...newUser, venue_ids: [...newUser.venue_ids, venue.id] })
+                        } else {
+                          setNewUser({ ...newUser, venue_ids: newUser.venue_ids.filter(id => id !== venue.id) })
+                        }
+                      }}
+                      className="rounded border-gray-300 text-emerald-600 shadow-sm focus:border-emerald-300 focus:ring focus:ring-emerald-200 focus:ring-opacity-50"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">{venue.name}</span>
+                  </label>
+                ))}
               </div>
-            )}
+              {newUser.role === 'staff' && newUser.venue_ids.length === 0 && (
+                <p className="mt-1 text-sm text-red-600">Select at least one venue for staff users.</p>
+              )}
+            </div>
 
             <div className="flex justify-end space-x-3">
               <button
@@ -413,32 +420,36 @@ export default function UserManagement({ user }: UserManagementProps) {
               />
             </div>
 
-            {editUser.role === 'staff' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Venue Access
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {venues.map((venue) => (
-                    <label key={venue.id} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={editUser.venue_ids.includes(venue.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setEditUser({ ...editUser, venue_ids: [...editUser.venue_ids, venue.id] })
-                          } else {
-                            setEditUser({ ...editUser, venue_ids: editUser.venue_ids.filter(id => id !== venue.id) })
-                          }
-                        }}
-                        className="rounded border-gray-300 text-emerald-600 shadow-sm focus:border-emerald-300 focus:ring focus:ring-emerald-200 focus:ring-opacity-50"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">{venue.name}</span>
-                    </label>
-                  ))}
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Assigned locations
+                {editUser.role === 'staff' ? ' (required)' : ' (email notifications)'}
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                {editUser.role === 'staff'
+                  ? 'Staff can only view and submit reports for selected venues.'
+                  : 'Admins still see all venues in the app; selected locations control which report emails they receive.'}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {venues.map((venue) => (
+                  <label key={venue.id} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={editUser.venue_ids.includes(venue.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setEditUser({ ...editUser, venue_ids: [...editUser.venue_ids, venue.id] })
+                        } else {
+                          setEditUser({ ...editUser, venue_ids: editUser.venue_ids.filter(id => id !== venue.id) })
+                        }
+                      }}
+                      className="rounded border-gray-300 text-emerald-600 shadow-sm focus:border-emerald-300 focus:ring focus:ring-emerald-200 focus:ring-opacity-50"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">{venue.name}</span>
+                  </label>
+                ))}
               </div>
-            )}
+            </div>
 
             <div className="flex justify-end space-x-3">
               <button

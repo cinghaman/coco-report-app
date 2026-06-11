@@ -9,8 +9,17 @@ import { lineNetByCashReportId } from '@/lib/cash-report'
 import Link from 'next/link'
 
 export type DashboardActivityRow =
-  | { kind: 'daily'; report: DailyReport }
-  | { kind: 'cash'; report: CashReport; closingCash: number }
+  | { kind: 'daily'; report: DailyReport; venueName: string }
+  | { kind: 'cash'; report: CashReport; closingCash: number; venueName: string }
+
+function resolveVenueName(
+  venueId: string,
+  joinedName: string | null | undefined,
+  catalog: Venue[]
+): string {
+  if (joinedName) return joinedName
+  return catalog.find((v) => v.id === venueId)?.name ?? 'Unknown venue'
+}
 
 interface DashboardContentProps {
   user: User
@@ -19,7 +28,6 @@ interface DashboardContentProps {
 export default function DashboardContent({ user }: DashboardContentProps) {
   const [activityRows, setActivityRows] = useState<DashboardActivityRow[]>([])
   const [venues, setVenues] = useState<Venue[]>([])
-  const [venueCatalog, setVenueCatalog] = useState<Venue[]>([])
   const [loading, setLoading] = useState(true)
   const [venueStats, setVenueStats] = useState<Record<string, {
     totalReports: number
@@ -80,7 +88,6 @@ export default function DashboardContent({ user }: DashboardContentProps) {
 
       const visibleVenues = accessibleVenues.filter((v) => !isHiddenFromDashboard(v))
       setVenues(visibleVenues)
-      setVenueCatalog(allVenuesData || [])
 
       const excludeHiddenVenues = <T extends { neq: (c: string, v: string) => T }>(q: T) => {
         let out = q
@@ -162,24 +169,27 @@ export default function DashboardContent({ user }: DashboardContentProps) {
       const dailyIds = slice.filter((s) => s.kind === 'daily').map((s) => s.id)
       const cashIds = slice.filter((s) => s.kind === 'cash').map((s) => s.id)
 
-      const dailyById = new Map<string, DailyReport>()
+      type DailyWithVenue = DailyReport & { venues?: { name: string } | null }
+      type CashWithVenue = CashReport & { venues?: { name: string } | null }
+
+      const dailyById = new Map<string, DailyWithVenue>()
       if (dailyIds.length > 0) {
         const { data: dailyFull, error: dailyFullError } = await supabase
           .from('daily_reports')
-          .select('*')
+          .select('*, venues(name)')
           .in('id', dailyIds)
         if (dailyFullError) throw dailyFullError
-        for (const r of dailyFull || []) dailyById.set(r.id, r as DailyReport)
+        for (const r of dailyFull || []) dailyById.set(r.id, r as DailyWithVenue)
       }
 
-      const cashById = new Map<string, CashReport>()
+      const cashById = new Map<string, CashWithVenue>()
       if (cashIds.length > 0) {
         const { data: cashFull, error: cashFullError } = await supabase
           .from('cash_reports')
-          .select('*')
+          .select('*, venues(name)')
           .in('id', cashIds)
         if (cashFullError) throw cashFullError
-        for (const r of cashFull || []) cashById.set(r.id, r as CashReport)
+        for (const r of cashFull || []) cashById.set(r.id, r as CashWithVenue)
       }
 
       let cashLineNetById = new Map<string, number>()
@@ -192,17 +202,37 @@ export default function DashboardContent({ user }: DashboardContentProps) {
         cashLineNetById = lineNetByCashReportId(cashLineRows ?? [])
       }
 
+      const catalog = allVenuesData || []
       const rows: DashboardActivityRow[] = []
       for (const s of slice) {
         if (s.kind === 'daily') {
           const report = dailyById.get(s.id)
-          if (report) rows.push({ kind: 'daily', report })
+          if (report) {
+            rows.push({
+              kind: 'daily',
+              report,
+              venueName: resolveVenueName(
+                report.venue_id,
+                report.venues?.name,
+                catalog
+              ),
+            })
+          }
         } else {
           const report = cashById.get(s.id)
           if (report) {
             const opening = Number(report.cash_from_previous_day) || 0
             const closing = opening + (cashLineNetById.get(s.id) ?? 0)
-            rows.push({ kind: 'cash', report, closingCash: closing })
+            rows.push({
+              kind: 'cash',
+              report,
+              closingCash: closing,
+              venueName: resolveVenueName(
+                report.venue_id,
+                report.venues?.name,
+                catalog
+              ),
+            })
           }
         }
       }
@@ -490,7 +520,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                               {formatDate(row.report.for_date)}
                             </div>
                             <div className="text-sm text-gray-500 truncate">
-                              {venues.find((v) => v.id === row.report.venue_id)?.name || 'Unknown Venue'}
+                              <span className="font-medium text-emerald-800">{row.venueName}</span>
                             </div>
                           </div>
                         </div>
@@ -543,8 +573,8 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                               {formatDate(row.report.for_date)}
                             </div>
                             <div className="text-sm text-gray-500 truncate">
-                              {venueCatalog.find((v) => v.id === row.report.venue_id)?.name || 'Venue'}{' '}
-                              <span className="text-emerald-600">· Open to edit</span>
+                              <span className="font-medium text-emerald-800">{row.venueName}</span>
+                              <span className="text-emerald-600"> · Open to edit</span>
                             </div>
                           </div>
                         </div>

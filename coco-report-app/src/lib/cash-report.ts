@@ -1,37 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Venue } from './supabase'
+import { isHiddenFromDashboard } from './dashboard-venue-filter'
 
-/** Single-venue app: resolve Coco Lounge for `venue_id` on cash reports. */
-export async function resolveCocoLoungeVenueId(
+/** Active venues available for cash reports (excludes dashboard-hidden locations). */
+export async function fetchCashReportVenues(
   supabase: SupabaseClient
-): Promise<string | null> {
-  const slugs = ['coco-lounge', 'coco_lounge']
-  for (const slug of slugs) {
-    const { data } = await supabase
-      .from('venues')
-      .select('id')
-      .eq('is_active', true)
-      .eq('slug', slug)
-      .maybeSingle()
-    if (data?.id) return data.id
-  }
-
-  const { data: byName } = await supabase
+): Promise<Venue[]> {
+  const { data, error } = await supabase
     .from('venues')
-    .select('id')
-    .eq('is_active', true)
-    .ilike('name', '%coco lounge%')
-    .limit(1)
-    .maybeSingle()
-  if (byName?.id) return byName.id
-
-  const { data: fallback } = await supabase
-    .from('venues')
-    .select('id')
+    .select('*')
     .eq('is_active', true)
     .order('name')
-    .limit(1)
-    .maybeSingle()
-  return fallback?.id ?? null
+
+  if (error) throw error
+  return (data ?? []).filter((v) => !isHiddenFromDashboard(v))
 }
 
 /** Net movement from line items: sum(income) − sum(expense). */

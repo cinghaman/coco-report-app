@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
         email: 'admin@thoughtbulb.dev',
         role: 'admin',
         display_name: 'Admin User',
-        venue_ids: ['7c8cf6f7-74fe-4ec6-9233-3da22c41c157', '85ff2a93-7c37-464c-81cb-eea4a15e54c4'], // Both venues
+        venue_ids: ['7c8cf6f7-74fe-4ec6-9233-3da22c41c157'], // Coco Lounge
       })
 
     if (adminProfileError) {

@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import type { User, CashReportLine } from '@/lib/supabase'
+import type { User, Venue, CashReportLine } from '@/lib/supabase'
 import {
   closingCash,
+  fetchCashReportVenues,
   fetchOpeningCashForNewReport,
   netFromLines,
-  resolveCocoLoungeVenueId,
 } from '@/lib/cash-report'
+import { getVenueNotificationEmails } from '@/lib/report-notifications'
 
 export type LineDraft = {
   id: string
@@ -61,7 +62,9 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [venues, setVenues] = useState<Venue[]>([])
   const [venueId, setVenueId] = useState<string | null>(null)
+  const [venueName, setVenueName] = useState('')
   const [forDate, setForDate] = useState(() => new Date().toISOString().split('T')[0])
   const [cashFromPrevious, setCashFromPrevious] = useState(0)
   const [lines, setLines] = useState<LineDraft[]>([newLine()])
@@ -73,13 +76,15 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
     try {
       const { data: report, error: re } = await supabase
         .from('cash_reports')
-        .select('*')
+        .select('*, venues(name)')
         .eq('id', reportId)
         .single()
       if (re) throw re
       if (!report) throw new Error('Report not found')
 
+      const joinedVenue = report.venues as { name: string } | null
       setVenueId(report.venue_id)
+      setVenueName(joinedVenue?.name ?? '')
       setForDate(report.for_date)
       setCashFromPrevious(Number(report.cash_from_previous_day) || 0)
 
@@ -122,15 +127,17 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
         if (reportId) {
           await loadReport()
         } else {
-          const id = await resolveCocoLoungeVenueId(supabase)
-          if (!id) {
-            setError(
-              'No active venue found for Coco Lounge. Check venues (slug coco-lounge or name).'
-            )
+          const venueList = await fetchCashReportVenues(supabase)
+          if (!venueList.length) {
+            setError('No active venues available for cash reports.')
             setLoading(false)
             return
           }
-          setVenueId(id)
+          setVenues(venueList)
+          if (venueList.length === 1) {
+            setVenueId(venueList[0].id)
+            setVenueName(venueList[0].name)
+          }
           setLoading(false)
         }
       } catch (err: unknown) {
@@ -178,9 +185,12 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
   const handleSave = async () => {
     if (!supabase) return
     if (!venueId || !forDate) {
-      setError(!venueId ? 'Venue could not be resolved' : 'Select a date')
+      setError(!venueId ? 'Select a venue' : 'Select a date')
       return
     }
+
+    const selectedVenueName =
+      venueName || venues.find((v) => v.id === venueId)?.name || 'Unknown venue'
     setSaving(true)
     setError(null)
     try {
@@ -246,21 +256,22 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
       try {
         const { data: adminUsers, error: adminError } = await supabase
           .from('users')
-          .select('email, display_name, role')
+          .select('email, display_name, role, venue_ids')
           .in('role', ['admin', 'owner'])
 
         if (adminError) {
           console.error('Cash report email: error fetching admin emails:', adminError)
         }
 
-        const adminEmails = adminUsers?.map((u) => u.email).filter(Boolean) || []
-        const requiredAdminEmails = ['admin@thoughtbulb.dev', 'shetty.aneet@gmail.com']
-        const recipientEmails = [...new Set([...adminEmails, ...requiredAdminEmails])]
-        const to =
-          recipientEmails.length > 0 ? recipientEmails : requiredAdminEmails
+        const recipientEmails = venueId
+          ? getVenueNotificationEmails(adminUsers ?? [], venueId)
+          : []
 
+        if (recipientEmails.length === 0) {
+          console.log('Cash report email: no admins assigned to this venue; skipping.')
+        } else {
         const action = isEdit ? 'Updated' : 'Created'
-        const subject = `Cash Report ${action} - Coco Lounge - ${forDate}`
+        const subject = `Cash Report ${action} - ${selectedVenueName} - ${forDate}`
         const closing = closingCash(cashFromPrevious, lines)
 
         const rowsHtml = lines
@@ -278,7 +289,7 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
 
         const html = `
           <h2>Cash Report ${action}</h2>
-          <p><strong>Venue:</strong> Coco Lounge</p>
+          <p><strong>Venue:</strong> ${escapeHtml(selectedVenueName)}</p>
           <p><strong>Date:</strong> ${forDate}</p>
           <p><strong>${action} by:</strong> ${escapeHtml(user.display_name || user.email)}</p>
           <p><strong>Cash from previous day:</strong> ${formatMoney(cashFromPrevious)}</p>
@@ -308,13 +319,14 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
         const emailResponse = await fetch('/api/send-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to, subject, html }),
+          body: JSON.stringify({ to: recipientEmails, subject, html }),
         })
         const emailResult = await emailResponse.json()
         if (emailResponse.ok) {
           console.log('Cash report email:', emailResult.message)
         } else {
           console.error('Cash report email failed:', emailResult)
+        }
         }
       } catch (emailErr) {
         console.error('Cash report email error:', emailErr)
@@ -348,12 +360,48 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
           </div>
         )}
 
-        <div className="max-w-md">
-          <p className="text-sm text-gray-600 mb-3">
-            <span className="font-medium text-gray-800">Coco Lounge</span>
-            <span className="text-gray-400"> · </span>
-            cash only
+        <div className="max-w-md space-y-4">
+          <p className="text-sm text-gray-600">
+            Cash income and expenses by document. Opening cash carries from the previous report for
+            the selected venue.
           </p>
+
+          {isEdit ? (
+            <div>
+              <span className="block text-sm font-medium text-gray-700">Venue</span>
+              <p className="mt-1 text-sm font-medium text-gray-900">{venueName || '—'}</p>
+            </div>
+          ) : venues.length > 1 ? (
+            <div>
+              <label htmlFor="cr-venue" className="block text-sm font-medium text-gray-700">
+                Venue *
+              </label>
+              <select
+                id="cr-venue"
+                value={venueId ?? ''}
+                onChange={(e) => {
+                  const id = e.target.value
+                  setVenueId(id || null)
+                  const venue = venues.find((v) => v.id === id)
+                  setVenueName(venue?.name ?? '')
+                }}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+              >
+                <option value="">Select a venue</option>
+                {venues.map((venue) => (
+                  <option key={venue.id} value={venue.id}>
+                    {venue.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div>
+              <span className="block text-sm font-medium text-gray-700">Venue</span>
+              <p className="mt-1 text-sm font-medium text-gray-900">{venues[0]?.name ?? '—'}</p>
+            </div>
+          )}
+
           <div>
             <label htmlFor="cr-date" className="block text-sm font-medium text-gray-700">
               Date *

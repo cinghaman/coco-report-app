@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { User, Venue, DailyReport, ReportStatus } from '@/lib/supabase'
 import { getTodaysCash } from '@/lib/todays-cash'
+import { getVenueNotificationEmails } from '@/lib/report-notifications'
 
 interface EODFormProps {
   user: User
@@ -579,35 +580,28 @@ export default function EODForm({ user, initialData }: EODFormProps) {
           const venue = venues.find(v => v.id === formData.venue_id)
           const venueName = venue?.name || 'Unknown Venue'
 
-          // Fetch all admin emails
           const { data: adminUsers, error: adminError } = await supabase
             .from('users')
-            .select('email, display_name, role')
+            .select('email, display_name, role, venue_ids')
             .in('role', ['admin', 'owner'])
 
           if (adminError) {
             console.error('Error fetching admin emails:', adminError)
           }
 
-          const adminEmails = adminUsers?.map(u => u.email).filter(Boolean) || []
-          
-          // Always include these admin emails as fallback/ensure they're included
-          const requiredAdminEmails = ['admin@thoughtbulb.dev', 'shetty.aneet@gmail.com']
-          const allAdminEmails = [...new Set([...adminEmails, ...requiredAdminEmails])] // Remove duplicates
-          
-          console.log('Report creation notification - Admin emails fetched:', {
-            fromDatabase: adminEmails,
-            totalRecipients: allAdminEmails,
+          const recipientEmails = getVenueNotificationEmails(adminUsers ?? [], formData.venue_id)
+
+          console.log('Report creation notification - venue-scoped recipients:', {
+            venueId: formData.venue_id,
+            venueName,
+            recipientEmails,
             adminUsersFound: adminUsers?.length || 0,
-            error: adminError?.message
+            error: adminError?.message,
           })
 
-          const recipientEmails = allAdminEmails.length > 0 
-            ? allAdminEmails 
-            : requiredAdminEmails // Final fallback
-
-          console.log('Preparing to send email notifications to:', recipientEmails)
-
+          if (recipientEmails.length === 0) {
+            console.log('No admins assigned to this venue for email notifications; skipping email.')
+          } else {
           const action = initialData ? 'Updated' : 'Created'
           const subject = `EOD Report ${action} - ${venueName} - ${formData.for_date}`
 
@@ -686,6 +680,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
           } catch (emailError) {
             console.error('Error sending email notifications:', emailError)
             // Don't fail the save operation if email fails
+          }
           }
 
         } catch (emailError) {

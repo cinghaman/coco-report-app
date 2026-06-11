@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from '@/lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import Mailgun from 'mailgun.js'
 import FormData from 'form-data'
+import { getVenueNotificationEmails } from '@/lib/report-notifications'
 
 export async function DELETE(
   request: NextRequest,
@@ -137,19 +138,16 @@ export async function DELETE(
       // Get all admin emails
       const { data: adminUsers } = await supabaseAdmin
         .from('users')
-        .select('email, display_name, role')
+        .select('email, display_name, role, venue_ids')
         .in('role', ['admin', 'owner'])
 
-      const adminEmails = adminUsers?.map(u => u.email).filter(Boolean) || []
-      
-      // Always include these admin emails as fallback/ensure they're included
-      const requiredAdminEmails = ['admin@thoughtbulb.dev', 'shetty.aneet@gmail.com']
-      const allAdminEmails = [...new Set([...adminEmails, ...requiredAdminEmails])] // Remove duplicates
-      
-      console.log('Report deletion notification - Admin emails:', {
-        fromDatabase: adminEmails,
+      const allAdminEmails = getVenueNotificationEmails(adminUsers ?? [], report.venue_id)
+
+      console.log('Report deletion notification - venue-scoped recipients:', {
+        venueId: report.venue_id,
+        venueName,
         totalRecipients: allAdminEmails,
-        adminUsersFound: adminUsers?.length || 0
+        adminUsersFound: adminUsers?.length || 0,
       })
       
       const reportDate = new Date(report.for_date).toLocaleDateString('pl-PL')

@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from '@/lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import Mailgun from 'mailgun.js'
 import FormData from 'form-data'
+import { getVenueNotificationEmails } from '@/lib/report-notifications'
 
 export async function DELETE(
   request: NextRequest,
@@ -101,12 +102,10 @@ export async function DELETE(
     try {
       const { data: adminUsers } = await supabaseAdmin
         .from('users')
-        .select('email, display_name, role')
+        .select('email, display_name, role, venue_ids')
         .in('role', ['admin', 'owner'])
 
-      const adminEmails = adminUsers?.map((u) => u.email).filter(Boolean) || []
-      const requiredAdminEmails = ['admin@thoughtbulb.dev', 'shetty.aneet@gmail.com']
-      const allAdminEmails = [...new Set([...adminEmails, ...requiredAdminEmails])]
+      const allAdminEmails = getVenueNotificationEmails(adminUsers ?? [], report.venue_id)
 
       const reportDate = new Date(report.for_date).toLocaleDateString('pl-PL')
       const opening = Number(report.cash_from_previous_day) || 0

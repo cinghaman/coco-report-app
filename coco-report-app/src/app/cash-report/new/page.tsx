@@ -52,7 +52,7 @@ export default function NewCashReportPage() {
         <div className="px-4 sm:px-0 mb-6">
           <h1 className="text-2xl font-bold text-gray-900">New cash report</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Coco Lounge — record cash movements with optional document numbers and descriptions.
+            Select a venue and record cash movements with optional document numbers and descriptions.
           </p>
         </div>
         <CashReportForm user={profile} />

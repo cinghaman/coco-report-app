@@ -16,6 +16,7 @@ type CashReportRow = {
   for_date: string
   cash_from_previous_day: number
   created_at: string
+  venue_name: string
   /** opening + Σ(income − expense) for lines; matches CashReportForm closing. */
   closing_cash: number
 }
@@ -43,14 +44,27 @@ export default function CashReportListPage() {
     setLoadError(null)
     const { data, error } = await supabase
       .from('cash_reports')
-      .select('id, for_date, cash_from_previous_day, created_at')
+      .select('id, for_date, cash_from_previous_day, created_at, venues(name)')
       .order('for_date', { ascending: false })
       .limit(100)
     if (error) {
       setLoadError(error.message)
       return
     }
-    const list = (data ?? []) as Omit<CashReportRow, 'closing_cash'>[]
+    const list = (data ?? []).map((row) => {
+      const joinedVenue = row.venues as { name: string } | null
+      const { venues: _venues, ...rest } = row as {
+        id: string
+        for_date: string
+        cash_from_previous_day: number
+        created_at: string
+        venues: { name: string } | null
+      }
+      return {
+        ...rest,
+        venue_name: joinedVenue?.name ?? 'Unknown venue',
+      }
+    })
     const ids = list.map((r) => r.id)
     let netById = new Map<string, number>()
     if (ids.length > 0) {
@@ -146,8 +160,8 @@ export default function CashReportListPage() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Cash Report</h1>
               <p className="mt-1 text-sm text-gray-500">
-                Coco Lounge — cash income and expenses by document. Opening cash carries from the
-                previous report.
+                Cash income and expenses by venue and document. Opening cash carries from the previous
+                report for each location.
               </p>
             </div>
             <Link
@@ -184,7 +198,7 @@ export default function CashReportListPage() {
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div>
-                        <p className="text-sm font-medium text-emerald-800">Coco Lounge</p>
+                        <p className="text-sm font-medium text-emerald-800">{r.venue_name}</p>
                         <p className="text-sm text-gray-500">{formatRowDate(r.for_date)}</p>
                       </div>
                       <div className="text-right flex-shrink-0 flex gap-6 sm:gap-8 justify-end">

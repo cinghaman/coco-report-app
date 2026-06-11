@@ -234,8 +234,13 @@ export default function UsersAdminPage() {
                             {/* Venue Selection - Show for all roles */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Venue Access {newUser.role === 'staff' && '(Required)'}
+                                    Assigned locations {newUser.role === 'staff' ? '(required)' : '(email notifications)'}
                                 </label>
+                                {newUser.role !== 'staff' && (
+                                    <p className="text-xs text-gray-500 mb-2">
+                                        Admins still see all venues in the app; selected locations control which report emails they receive.
+                                    </p>
+                                )}
                                 {venues.length === 0 ? (
                                     <p className="text-sm text-gray-500">Loading venues...</p>
                                 ) : (
