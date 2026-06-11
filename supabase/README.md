@@ -12,6 +12,7 @@ Migrations live in `supabase/migrations/`. Filenames use UTC timestamps; Supabas
 | `20260612010000_remove_coco_chmielna_venue.sql` | Removes closed Coco Chmielna + cleans `users.venue_ids` |
 | `20260612020000_venue_email_notification_scope.sql` | Documents `users.venue_ids` email scope; seeds operator assignments |
 | `20260612030000_fix_analytics_withdrawal_join.sql` | Fixes inflated analytics when multiple withdrawals exist |
+| `20260612040000_admin_venue_scoped_access.sql` | Admins limited to `venue_ids`; owners see all venues (RLS) |
 
 Production already has equivalent changes applied via MCP under different migration version IDs (`20260611224431`, etc.). Content matches; only timestamps differ.
 

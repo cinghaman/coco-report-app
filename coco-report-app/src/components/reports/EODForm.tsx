@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import type { User, Venue, DailyReport, ReportStatus } from '@/lib/supabase'
 import { getTodaysCash } from '@/lib/todays-cash'
 import { getVenueNotificationEmails } from '@/lib/report-notifications'
+import { filterVenuesForUser } from '@/lib/venue-access'
 
 interface EODFormProps {
   user: User
@@ -179,12 +180,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
 
       if (error) throw error
 
-      const accessibleVenues = data?.filter(
-        (venue) =>
-          user.role === 'admin' ||
-          user.role === 'owner' ||
-          user.venue_ids.includes(venue.id)
-      ) || []
+      const accessibleVenues = filterVenuesForUser(user, data ?? [])
 
       setVenues(accessibleVenues)
 

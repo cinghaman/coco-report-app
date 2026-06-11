@@ -8,7 +8,7 @@ const VENUE_NOTIFICATION_ROLES = new Set(['admin', 'owner'])
 
 /**
  * Emails for venue-specific report/cash-report alerts.
- * Admins and owners still see all venues in the app; `venue_ids` only scopes email.
+ * `venue_ids` scopes who receives alerts. Owners with empty `venue_ids` get no venue emails.
  */
 export function getVenueNotificationEmails(
   users: VenueNotificationUser[],

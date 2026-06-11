@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import type { User } from '@/lib/supabase'
 import Header from '@/components/layout/Header'
 import EODForm from '@/components/reports/EODForm'
+import { canEditReport } from '@/lib/venue-access'
 
 interface ReportEditPageProps {
   params: Promise<{
@@ -64,13 +65,7 @@ export default function ReportEditPage({ params }: ReportEditPageProps) {
         return
       }
 
-      // Admins and owners can edit any report; staff only their own drafts
-      const canEdit =
-        userProfile.role === 'admin' ||
-        userProfile.role === 'owner' ||
-        (reportData.created_by === session.user.id && reportData.status === 'draft')
-      
-      if (!canEdit) {
+      if (!canEditReport(userProfile, reportData)) {
         window.location.href = '/dashboard'
         return
       }

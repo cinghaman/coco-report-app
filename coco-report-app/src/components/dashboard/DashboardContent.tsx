@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import type { User, DailyReport, Venue, CashReport } from '@/lib/supabase'
 import { getTodaysCash } from '@/lib/todays-cash'
 import { isHiddenFromDashboard } from '@/lib/dashboard-venue-filter'
+import { filterVenuesForUser, userHasFullVenueAccess } from '@/lib/venue-access'
 import { lineNetByCashReportId } from '@/lib/cash-report'
 import Link from 'next/link'
 
@@ -42,8 +43,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
   const [totalPages, setTotalPages] = useState(0)
   const reportsPerPage = 10
   const canSeeCashReports = user.role === 'admin' || user.role === 'owner'
-  /** Admin and owner see all venues / all daily rows; staff are scoped to venue_ids */
-  const canAccessAllVenues = user.role === 'admin' || user.role === 'owner'
+  const canAccessAllVenues = userHasFullVenueAccess(user)
   const canDeleteDailyReports = canSeeCashReports
   const META_LIMIT = 2000
 
@@ -81,10 +81,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
       const hiddenVenueIds =
         allVenuesData?.filter(isHiddenFromDashboard).map((v) => v.id) ?? []
 
-      const accessibleVenues = allVenuesData?.filter(
-        (venue) =>
-          canAccessAllVenues || user.venue_ids.includes(venue.id)
-      ) || []
+      const accessibleVenues = filterVenuesForUser(user, allVenuesData ?? [])
 
       const visibleVenues = accessibleVenues.filter((v) => !isHiddenFromDashboard(v))
       setVenues(visibleVenues)
@@ -131,12 +128,16 @@ export default function DashboardContent({ user }: DashboardContentProps) {
       }
 
       let cashPart: MetaRow[] = []
-      if (canSeeCashReports) {
-        const { data: cashMeta, error: cashMetaError } = await supabase
+      if (canSeeCashReports && (canAccessAllVenues || (user.venue_ids?.length ?? 0) > 0)) {
+        let cashMetaQuery = supabase
           .from('cash_reports')
           .select('id, for_date, created_at')
           .order('for_date', { ascending: false })
           .limit(META_LIMIT)
+        if (!canAccessAllVenues) {
+          cashMetaQuery = cashMetaQuery.in('venue_id', user.venue_ids)
+        }
+        const { data: cashMeta, error: cashMetaError } = await cashMetaQuery
         if (cashMetaError) throw cashMetaError
         cashPart = (cashMeta || []).map((r) => ({
           kind: 'cash',
@@ -422,8 +423,8 @@ export default function DashboardContent({ user }: DashboardContentProps) {
         </div>
       </div>
 
-      {/* Venue sales cards — full org view (admin + owner) */}
-      {canAccessAllVenues && (
+      {/* Venue sales cards for assigned / all venues */}
+      {venues.length > 0 && (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           {venues.map((venue) => {
             const stats = venueStats[venue.id] || { totalReports: 0, approvedReports: 0, totalGrossRevenue: 0, totalNetRevenue: 0 }

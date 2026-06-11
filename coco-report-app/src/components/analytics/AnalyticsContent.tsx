@@ -15,6 +15,7 @@ import type {
   PaymentMixRow,
   VenueFinancialRow,
 } from '@/lib/financial-report'
+import { filterVenuesForUser, userHasFullVenueAccess } from '@/lib/venue-access'
 
 type CashReportSummary = {
   reportCount: number
@@ -178,15 +179,19 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
 
       if (venueError) throw venueError
 
-      const accessibleVenues =
-        data?.filter(
-          (venue: Venue) =>
-            user.role === 'admin' ||
-            user.role === 'owner' ||
-            user.venue_ids.includes(venue.id)
-        ) || []
-
+      const accessibleVenues = filterVenuesForUser(user, data ?? [])
       setVenues(accessibleVenues)
+
+      if (!userHasFullVenueAccess(user)) {
+        if (accessibleVenues.length === 1) {
+          setSelectedVenueId(accessibleVenues[0].id)
+        } else if (
+          selectedVenueId !== 'all' &&
+          !accessibleVenues.some((v) => v.id === selectedVenueId)
+        ) {
+          setSelectedVenueId(accessibleVenues[0]?.id ?? 'all')
+        }
+      }
     } catch (err) {
       console.error('Error fetching venues:', err)
     }
@@ -343,7 +348,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
               onChange={(e) => setSelectedVenueId(e.target.value)}
               className="block w-full max-w-md px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-gray-900"
             >
-              <option value="all">All Venues</option>
+              {userHasFullVenueAccess(user) && <option value="all">All Venues</option>}
               {venues.map((venue) => (
                 <option key={venue.id} value={venue.id}>
                   {venue.name}
@@ -415,6 +420,14 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
             <p className="text-sm text-blue-700">
               Please select both start and end dates above to view the financial report.
+            </p>
+          </div>
+        )}
+
+        {venues.length === 0 && !loading && (
+          <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
+            <p className="text-sm text-amber-900">
+              No venues are assigned to your account. Ask an owner to assign locations in Admin → Users.
             </p>
           </div>
         )}

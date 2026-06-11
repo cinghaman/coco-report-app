@@ -11,6 +11,7 @@ import {
   netFromLines,
 } from '@/lib/cash-report'
 import { getVenueNotificationEmails } from '@/lib/report-notifications'
+import { filterVenuesForUser } from '@/lib/venue-access'
 
 export type LineDraft = {
   id: string
@@ -127,9 +128,10 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
         if (reportId) {
           await loadReport()
         } else {
-          const venueList = await fetchCashReportVenues(supabase)
+          const allVenues = await fetchCashReportVenues(supabase)
+          const venueList = filterVenuesForUser(user, allVenues)
           if (!venueList.length) {
-            setError('No active venues available for cash reports.')
+            setError('No venues assigned to your account for cash reports.')
             setLoading(false)
             return
           }

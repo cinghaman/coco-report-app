@@ -66,14 +66,7 @@ export const hasRole = (userRole: UserRole, requiredRole: UserRole): boolean => 
   return roleHierarchy[userRole] >= roleHierarchy[requiredRole]
 }
 
-// Check if user can access venue
-export const canAccessVenue = (user: User, venueId: string): boolean => {
-  if (hasRole(user.role, 'admin')) {
-    return true // Admins can access all venues
-  }
-  
-  return user.venue_ids.includes(venueId)
-}
+export { canAccessVenue, userHasFullVenueAccess } from './venue-access'
 
 // Sign out
 export const signOut = async () => {

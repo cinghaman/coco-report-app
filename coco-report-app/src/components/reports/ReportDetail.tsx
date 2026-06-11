@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { User, DailyReport, Venue } from '@/lib/supabase'
 import { getTodaysCash } from '@/lib/todays-cash'
+import { canEditReport, canViewReport } from '@/lib/venue-access'
 
 interface ReportDetailProps {
   reportId: string
@@ -73,14 +74,9 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
 
       if (reportError) throw reportError
 
-      // Check if user can access this report
-      if (reportData.created_by !== user.id && !hasRole(user.role, 'admin')) {
-        // Check if user has access to this venue and report is approved/submitted
-        if (!user.venue_ids.includes(reportData.venue_id) || 
-            !['approved', 'submitted', 'locked'].includes(reportData.status)) {
-          setError('You do not have permission to view this report')
-          return
-        }
+      if (!canViewReport(user, reportData)) {
+        setError('You do not have permission to view this report')
+        return
       }
 
       // Fetch withdrawals for this report
@@ -145,17 +141,6 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
     fetchReport()
   }, [fetchReport])
 
-  const hasRole = (userRole: string, requiredRole: string): boolean => {
-    const roleHierarchy: Record<string, number> = {
-      staff: 1,
-      admin: 2,
-      owner: 3
-    }
-    
-    return roleHierarchy[userRole] >= roleHierarchy[requiredRole]
-  }
-
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('pl-PL', {
       style: 'currency',
@@ -191,12 +176,7 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
     }
   }
 
-  const canEdit = () => {
-    if (!report) return false
-    // Admins can edit any report, staff can only edit their own drafts
-    if (hasRole(user.role, 'admin')) return true
-    return report.created_by === user.id && report.status === 'draft'
-  }
+  const canEdit = () => (report ? canEditReport(user, report) : false)
 
 
   if (loading) {

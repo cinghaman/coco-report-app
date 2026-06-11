@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import type { User } from '@/lib/supabase'
 import Header from '@/components/layout/Header'
 import { lineNetByCashReportId } from '@/lib/cash-report'
+import { getVenueScopeIds } from '@/lib/venue-access'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(n)
@@ -39,14 +40,23 @@ export default function CashReportListPage() {
   const formatRowDate = (forDate: string) =>
     new Date(forDate + 'T12:00:00').toLocaleDateString('pl-PL')
 
-  const fetchList = useCallback(async () => {
+  const fetchList = useCallback(async (userProfile: User) => {
     if (!supabase) return
     setLoadError(null)
-    const { data, error } = await supabase
+    const scopeIds = getVenueScopeIds(userProfile)
+    if (scopeIds && scopeIds.length === 0) {
+      setRows([])
+      return
+    }
+    let query = supabase
       .from('cash_reports')
       .select('id, for_date, cash_from_previous_day, created_at, venues(name)')
       .order('for_date', { ascending: false })
       .limit(100)
+    if (scopeIds) {
+      query = query.in('venue_id', scopeIds)
+    }
+    const { data, error } = await query
     if (error) {
       setLoadError(error.message)
       return
@@ -110,7 +120,7 @@ export default function CashReportListPage() {
           return
         }
         setProfile(userProfile)
-        await fetchList()
+        await fetchList(userProfile)
       } finally {
         setLoading(false)
       }
@@ -134,7 +144,7 @@ export default function CashReportListPage() {
       const res = await fetch(`/api/cash-reports/${deleteConfirm.id}`, { method: 'DELETE' })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error((body as { error?: string }).error || 'Delete failed')
-      await fetchList()
+      if (profile) await fetchList(profile)
       setDeleteConfirm({ show: false, id: null, dateLabel: null })
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Delete failed')

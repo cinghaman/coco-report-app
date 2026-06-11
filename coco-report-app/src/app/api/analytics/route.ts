@@ -37,23 +37,54 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Supabase admin client not configured' }, { status: 500 })
     }
 
-    const { startDate, endDate, userRole, venueId } = await request.json()
+    const { startDate, endDate, userId, userRole, venueId } = await request.json()
 
     if (!startDate || !endDate) {
       return NextResponse.json({ error: 'Start date and end date are required' }, { status: 400 })
+    }
+
+    if (!userId) {
+      return NextResponse.json({ error: 'User id is required' }, { status: 400 })
     }
 
     if (userRole !== 'admin' && userRole !== 'owner') {
       return NextResponse.json({ error: 'Access denied. Only administrators can view analytics.' }, { status: 403 })
     }
 
+    const { data: requester, error: requesterError } = await admin
+      .from('users')
+      .select('id, role, venue_ids')
+      .eq('id', userId)
+      .single()
+
+    if (requesterError || !requester) {
+      return NextResponse.json({ error: 'User not found' }, { status: 403 })
+    }
+
+    if (requester.role !== userRole) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+    }
+
+    const scopedVenueIds: string[] | null =
+      requester.role === 'owner' ? null : (requester.venue_ids ?? [])
+
+    if (scopedVenueIds && scopedVenueIds.length === 0) {
+      return NextResponse.json({ error: 'No venues assigned to this account' }, { status: 403 })
+    }
+
+    let effectiveVenueId: string | null = venueId || null
+    if (effectiveVenueId && scopedVenueIds && !scopedVenueIds.includes(effectiveVenueId)) {
+      return NextResponse.json({ error: 'Access denied for this venue' }, { status: 403 })
+    }
+
     const startStr = toDateOnly(startDate)
     const endStr = toDateOnly(endDate)
 
-    const cacheKey = generateCacheKey('financial-report-v2', {
+    const cacheKey = generateCacheKey('financial-report-v3', {
       startDate: startStr,
       endDate: endStr,
-      venueId: venueId || 'all',
+      userId,
+      venueId: effectiveVenueId || (scopedVenueIds ? scopedVenueIds.join(',') : 'all'),
     })
 
     const cached = cache.get(cacheKey)
@@ -73,7 +104,11 @@ export async function POST(request: NextRequest) {
         .order('for_date')
         .range(offset, offset + PAGE - 1)
 
-      if (venueId) q = q.eq('venue_id', venueId)
+      if (effectiveVenueId) {
+        q = q.eq('venue_id', effectiveVenueId)
+      } else if (scopedVenueIds) {
+        q = q.in('venue_id', scopedVenueIds)
+      }
 
       const { data, error } = await q
       if (error) throw error
@@ -184,8 +219,12 @@ export async function POST(request: NextRequest) {
       }))
       .sort((a, b) => a.venueName.localeCompare(b.venueName))
 
-    if (!venueId) {
-      for (const v of venues ?? []) {
+    if (!effectiveVenueId) {
+      const visibleVenues =
+        scopedVenueIds != null
+          ? (venues ?? []).filter((v) => scopedVenueIds.includes(v.id))
+          : (venues ?? [])
+      for (const v of visibleVenues) {
         if (!byVenue.has(v.id)) {
           venueFinancial.push({
             venueId: v.id,
@@ -197,20 +236,30 @@ export async function POST(request: NextRequest) {
       venueFinancial.sort((a, b) => a.venueName.localeCompare(b.venueName))
     }
 
-    const { count: totalReports } = await admin
+    let totalReportsQuery = admin
       .from('daily_reports')
       .select('*', { count: 'exact', head: true })
       .gte('for_date', startStr)
       .lte('for_date', endStr)
-      .match(venueId ? { venue_id: venueId } : {})
+    if (effectiveVenueId) {
+      totalReportsQuery = totalReportsQuery.eq('venue_id', effectiveVenueId)
+    } else if (scopedVenueIds) {
+      totalReportsQuery = totalReportsQuery.in('venue_id', scopedVenueIds)
+    }
+    const { count: totalReports } = await totalReportsQuery
 
-    const { count: pendingReports } = await admin
+    let pendingReportsQuery = admin
       .from('daily_reports')
       .select('*', { count: 'exact', head: true })
       .gte('for_date', startStr)
       .lte('for_date', endStr)
       .in('status', ['draft', 'submitted'])
-      .match(venueId ? { venue_id: venueId } : {})
+    if (effectiveVenueId) {
+      pendingReportsQuery = pendingReportsQuery.eq('venue_id', effectiveVenueId)
+    } else if (scopedVenueIds) {
+      pendingReportsQuery = pendingReportsQuery.in('venue_id', scopedVenueIds)
+    }
+    const { count: pendingReports } = await pendingReportsQuery
 
     let cashReportSummary = {
       reportCount: 0,
@@ -227,7 +276,11 @@ export async function POST(request: NextRequest) {
       .gte('for_date', startStr)
       .lte('for_date', endStr)
 
-    if (venueId) cashQ = cashQ.eq('venue_id', venueId)
+    if (effectiveVenueId) {
+      cashQ = cashQ.eq('venue_id', effectiveVenueId)
+    } else if (scopedVenueIds) {
+      cashQ = cashQ.in('venue_id', scopedVenueIds)
+    }
 
     const { data: cashReports } = await cashQ
     const cashIds = (cashReports ?? []).map((r) => r.id)

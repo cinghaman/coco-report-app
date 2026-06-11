@@ -320,12 +320,12 @@ export default function UserManagement({ user }: UserManagementProps) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Assigned locations
-                {newUser.role === 'staff' ? ' (required)' : ' (email notifications)'}
+                {newUser.role === 'staff' ? ' (required)' : ' (required for venue access)'}
               </label>
               <p className="text-xs text-gray-500 mb-2">
                 {newUser.role === 'staff'
                   ? 'Staff can only view and submit reports for selected venues.'
-                  : 'Admins still see all venues in the app; selected locations control which report emails they receive.'}
+                  : 'Admins only see reports, cash reports, and financial data for selected venues. Same list controls email alerts.'}
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {venues.map((venue) => (
@@ -346,8 +346,8 @@ export default function UserManagement({ user }: UserManagementProps) {
                   </label>
                 ))}
               </div>
-              {newUser.role === 'staff' && newUser.venue_ids.length === 0 && (
-                <p className="mt-1 text-sm text-red-600">Select at least one venue for staff users.</p>
+              {newUser.venue_ids.length === 0 && (
+                <p className="mt-1 text-sm text-red-600">Select at least one venue.</p>
               )}
             </div>
 
@@ -423,12 +423,12 @@ export default function UserManagement({ user }: UserManagementProps) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Assigned locations
-                {editUser.role === 'staff' ? ' (required)' : ' (email notifications)'}
+                {editUser.role === 'staff' ? ' (required)' : ' (required for venue access)'}
               </label>
               <p className="text-xs text-gray-500 mb-2">
                 {editUser.role === 'staff'
                   ? 'Staff can only view and submit reports for selected venues.'
-                  : 'Admins still see all venues in the app; selected locations control which report emails they receive.'}
+                  : 'Admins only see reports, cash reports, and financial data for selected venues. Same list controls email alerts.'}
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {venues.map((venue) => (
