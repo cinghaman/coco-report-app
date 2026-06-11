@@ -72,6 +72,9 @@ function formatPct(value: number) {
   return `${value.toFixed(1)}%`
 }
 
+const amountCell = 'text-right tabular-nums text-gray-900 font-medium'
+const countCell = 'text-right tabular-nums text-gray-800'
+
 function MetricCard({
   label,
   value,
@@ -461,7 +464,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
               title="Payment channels"
               description="How revenue came in — share of total payment mix"
             >
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <table className="min-w-full divide-y divide-gray-200 text-sm text-gray-900">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-2 text-left font-medium text-gray-500">Channel</th>
@@ -473,20 +476,18 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                   {reportData.paymentMix.map((row) => (
                     <tr key={row.key}>
                       <td className="px-4 py-2 text-gray-900">{row.label}</td>
-                      <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(row.amount)}</td>
-                      <td className="px-4 py-2 text-right tabular-nums text-gray-600">
-                        {formatPct(row.share)}
-                      </td>
+                      <td className={`px-4 py-2 ${amountCell}`}>{formatCurrency(row.amount)}</td>
+                      <td className={`px-4 py-2 ${countCell}`}>{formatPct(row.share)}</td>
                     </tr>
                   ))}
-                  <tr className="bg-gray-50 font-medium">
+                  <tr className="bg-gray-50 font-semibold">
                     <td className="px-4 py-2 text-gray-900">Cards total</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(s.cardsTotal)}</td>
+                    <td className={`px-4 py-2 ${amountCell}`}>{formatCurrency(s.cardsTotal)}</td>
                     <td className="px-4 py-2" />
                   </tr>
-                  <tr className="bg-gray-50 font-medium">
+                  <tr className="bg-gray-50 font-semibold">
                     <td className="px-4 py-2 text-gray-900">Delivery apps total</td>
-                    <td className="px-4 py-2 text-right tabular-nums">
+                    <td className={`px-4 py-2 ${amountCell}`}>
                       {formatCurrency(s.deliveryAppsTotal)}
                     </td>
                     <td className="px-4 py-2" />
@@ -510,7 +511,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                 <tbody>
                   <tr>
                     {[s.glovo, s.uber, s.wolt, s.pyszne, s.bolt, s.przelew].map((val, i) => (
-                      <td key={i} className="px-4 py-2 text-right tabular-nums text-gray-900">
+                      <td key={i} className={`px-4 py-2 ${amountCell}`}>
                         {formatCurrency(val)}
                       </td>
                     ))}
@@ -522,28 +523,28 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
             {/* Operating costs */}
             {reportData.operatingCosts.length > 0 && (
               <SectionTable title="Operating costs & deductions">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left font-medium text-gray-500">Category</th>
-                      <th className="px-4 py-2 text-right font-medium text-gray-500">Amount</th>
+              <table className="min-w-full divide-y divide-gray-200 text-sm text-gray-900">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left font-medium text-gray-500">Category</th>
+                    <th className="px-4 py-2 text-right font-medium text-gray-500">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {reportData.operatingCosts.map((row) => (
+                    <tr key={row.label}>
+                      <td className="px-4 py-2 text-gray-900">{row.label}</td>
+                      <td className={`px-4 py-2 ${amountCell}`}>{formatCurrency(row.amount)}</td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {reportData.operatingCosts.map((row) => (
-                      <tr key={row.label}>
-                        <td className="px-4 py-2 text-gray-900">{row.label}</td>
-                        <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(row.amount)}</td>
-                      </tr>
-                    ))}
-                    <tr className="bg-gray-50 font-medium">
-                      <td className="px-4 py-2 text-gray-900">Total</td>
-                      <td className="px-4 py-2 text-right tabular-nums">
-                        {formatCurrency(totalOperatingCosts)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                  ))}
+                  <tr className="bg-gray-50 font-semibold">
+                    <td className="px-4 py-2 text-gray-900">Total</td>
+                    <td className={`px-4 py-2 ${amountCell}`}>
+                      {formatCurrency(totalOperatingCosts)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
               </SectionTable>
             )}
 
@@ -589,7 +590,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                   <tr>
                     {[s.cash, s.cashDeposits, s.flavor, s.drawer, s.lockerWithdrawal].map(
                       (val, i) => (
-                        <td key={i} className="px-4 py-2 text-right tabular-nums text-gray-900">
+                        <td key={i} className={`px-4 py-2 ${amountCell}`}>
                           {formatCurrency(val)}
                         </td>
                       )
@@ -602,7 +603,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
             {/* By venue */}
             {selectedVenueId === 'all' && (reportData.venueFinancial?.length ?? 0) > 0 && (
               <SectionTable title="By venue">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <table className="min-w-full divide-y divide-gray-200 text-sm text-gray-900">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-3 py-2 text-left font-medium text-gray-500">Venue</th>
@@ -621,21 +622,19 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                     {reportData.venueFinancial.map((row) => (
                       <tr key={row.venueId}>
                         <td className="px-3 py-2 font-medium text-gray-900">{row.venueName}</td>
-                        <td className="px-3 py-2 text-right tabular-nums text-gray-600">
-                          {row.reportCount}
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.grossSales)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.grossRevenue)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.netRevenue)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.cardsTotal)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.cash)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">
+                        <td className={`px-3 py-2 ${countCell}`}>{row.reportCount}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.grossSales)}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.grossRevenue)}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.netRevenue)}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.cardsTotal)}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.cash)}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>
                           {formatCurrency(row.deliveryAppsTotal)}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
+                        <td className={`px-3 py-2 ${amountCell}`}>
                           {formatCurrency(row.tableWithdrawals + row.lineWithdrawals)}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.todaysCash)}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.todaysCash)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -669,7 +668,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
               </div>
 
               {periodRows.length > 0 ? (
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <table className="min-w-full divide-y divide-gray-200 text-sm text-gray-900">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-3 py-2 text-left font-medium text-gray-500 sticky left-0 bg-gray-50">
@@ -694,42 +693,40 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                         <td className="px-3 py-2 font-medium text-gray-900 sticky left-0 bg-white">
                           {formatPeriod(row.date)}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums text-gray-600">
-                          {row.reportCount}
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.grossSales)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.grossRevenue)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.netRevenue)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.card1)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.card2)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.cash)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">
+                        <td className={`px-3 py-2 ${countCell}`}>{row.reportCount}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.grossSales)}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.grossRevenue)}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.netRevenue)}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.card1)}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.card2)}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.cash)}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>
                           {formatCurrency(row.deliveryAppsTotal)}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
+                        <td className={`px-3 py-2 ${amountCell}`}>
                           {formatCurrency(row.tableWithdrawals + row.lineWithdrawals)}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.staffCost)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(row.todaysCash)}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.staffCost)}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.todaysCash)}</td>
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-gray-50 font-medium">
+                  <tfoot className="bg-gray-50 font-semibold">
                     <tr>
                       <td className="px-3 py-2 text-gray-900 sticky left-0 bg-gray-50">Total</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{s.reportCount}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(s.grossSales)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(s.grossRevenue)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(s.netRevenue)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(s.card1)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(s.card2)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(s.cash)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">
+                      <td className={`px-3 py-2 ${countCell}`}>{s.reportCount}</td>
+                      <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(s.grossSales)}</td>
+                      <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(s.grossRevenue)}</td>
+                      <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(s.netRevenue)}</td>
+                      <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(s.card1)}</td>
+                      <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(s.card2)}</td>
+                      <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(s.cash)}</td>
+                      <td className={`px-3 py-2 ${amountCell}`}>
                         {formatCurrency(s.deliveryAppsTotal)}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totalWithdrawals)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(s.staffCost)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(s.todaysCash)}</td>
+                      <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(totalWithdrawals)}</td>
+                      <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(s.staffCost)}</td>
+                      <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(s.todaysCash)}</td>
                     </tr>
                   </tfoot>
                 </table>

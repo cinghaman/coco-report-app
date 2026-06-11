@@ -12,10 +12,11 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* App UI is light-themed (white cards on gray-50). Keep text dark for readability. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #f9fafb;
+    --foreground: #171717;
   }
 }
 
