@@ -1,0 +1,13 @@
+# Supabase local dev config. Link to production with:
+#   supabase link --project-ref wnwzifhngkynpxknovii
+
+project_id = "wnwzifhngkynpxknovii"
+
+[db]
+major_version = 15
+
+[api]
+enabled = true
+
+[studio]
+enabled = true

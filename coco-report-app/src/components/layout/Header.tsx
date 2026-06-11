@@ -60,12 +60,12 @@ export default function Header({ user }: HeaderProps) {
                 Cash Report
               </Link>
             )}
-            {user?.role === 'admin' && (
+            {(user?.role === 'admin' || user?.role === 'owner') && (
               <Link
                 href="/analytics"
                 className="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
               >
-                Analytics
+                Financial Report
               </Link>
             )}
             {user?.role === 'admin' && (
@@ -172,12 +172,12 @@ export default function Header({ user }: HeaderProps) {
                   Cash Report
                 </Link>
               )}
-              {user?.role === 'admin' && (
+              {(user?.role === 'admin' || user?.role === 'owner') && (
                 <Link
                   href="/analytics"
                   className="text-gray-500 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
                 >
-                  Analytics
+                  Financial Report
                 </Link>
               )}
               {user?.role === 'admin' && (

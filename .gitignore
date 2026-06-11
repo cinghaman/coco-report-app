@@ -33,6 +33,7 @@ openapi.yaml
 # Temporary scripts and files
 *.js
 *.sql
+!supabase/migrations/*.sql
 *.tmp
 *.temp
 

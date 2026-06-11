@@ -1,262 +1,332 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { cache, generateCacheKey } from '@/lib/cache'
-import { getTodaysCash } from '@/lib/todays-cash'
+import { aggregateAnalyticsByPeriod } from '@/lib/analytics-aggregation'
+import {
+  aggregateFinancialByDate,
+  buildOperatingCosts,
+  buildPaymentMix,
+  emptyFinancialTotals,
+  finalizeFinancialTotals,
+  sumReportRow,
+  type ApprovedReportRow,
+  type FinancialPeriodRow,
+  type VenueFinancialRow,
+} from '@/lib/financial-report'
+import { netFromLines } from '@/lib/cash-report'
 
 function toDateOnly(isoOrDate: string): string {
   if (isoOrDate.includes('T')) return isoOrDate.split('T')[0]
   return isoOrDate.slice(0, 10)
 }
 
-// Updated analytics API with enhanced error handling and revenue reporting
+const REPORT_FIELDS = `
+  id, for_date, venue_id, status,
+  total_sale_gross, gross_revenue, net_revenue,
+  card_1, card_2, cash, flavor, cash_deposits,
+  przelew, glovo, uber, wolt, pyszne, bolt,
+  total_sale_with_special_payment,
+  staff_cost, staff_spent, service_10_percent,
+  locker_withdrawal, deposit, drawer, withdrawal
+`
 
 export async function POST(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      console.error('Supabase admin client not configured. Check environment variables:')
-      console.error('NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'SET' : 'NOT SET')
-      console.error('SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET')
+    const admin = supabaseAdmin
+    if (!admin) {
       return NextResponse.json({ error: 'Supabase admin client not configured' }, { status: 500 })
     }
 
-    const { startDate, endDate, userId, userRole, venueId } = await request.json()
+    const { startDate, endDate, userRole, venueId } = await request.json()
 
     if (!startDate || !endDate) {
-      return NextResponse.json(
-        { error: 'Start date and end date are required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Start date and end date are required' }, { status: 400 })
     }
 
-    // Only allow admin users to access analytics
-    if (userRole !== 'admin') {
-      return NextResponse.json(
-        { error: 'Access denied. Only administrators can view analytics.' },
-        { status: 403 }
-      )
-    }
-
-    // Check cache first
-    const cacheKey = generateCacheKey('analytics', {
-      startDate,
-      endDate,
-      venueId: venueId || 'all'
-    })
-    
-    const cachedData = cache.get(cacheKey)
-    if (cachedData) {
-      return NextResponse.json(cachedData)
-    }
-
-    // Use optimized database functions for better performance with large datasets
-    const { data: analyticsData, error: analyticsError } = await supabaseAdmin
-      .rpc('get_analytics_data', {
-        p_start_date: startDate,
-        p_end_date: endDate,
-        p_venue_id: venueId || null
-      })
-
-    if (analyticsError) {
-      console.error('Analytics function error:', analyticsError)
-      throw analyticsError
-    }
-
-    const analytics = analyticsData?.[0]
-    if (!analytics) {
-      console.log('No analytics data returned for date range:', startDate, 'to', endDate)
-      // Return empty data structure instead of throwing error
-      const result = {
-        totalGrossSales: 0,
-        totalWithdrawals: 0,
-        totalTips: 0,
-        totalVoids: 0,
-        totalLoss: 0,
-        averageDailySales: 0,
-        averageDailyWithdrawals: 0,
-        totalGrossRevenue: 0,
-        totalNetRevenue: 0,
-        averageDailyGrossRevenue: 0,
-        averageDailyNetRevenue: 0,
-        totalTodaysCash: 0,
-        averageDailyTodaysCash: 0,
-        totalReports: 0,
-        approvedReports: 0,
-        pendingReports: 0,
-        dailyData: []
-      }
-      return NextResponse.json(result)
-    }
-
-    const totalGrossSales = Number(analytics.total_gross_sales) || 0
-    const totalTips = Number(analytics.total_tips) || 0
-    const totalVoids = Number(analytics.total_voids) || 0
-    const totalLoss = Number(analytics.total_loss) || 0
-    const totalReports = Number(analytics.total_reports) || 0
-    const approvedReportsCount = Number(analytics.approved_reports) || 0
-    const pendingReports = Number(analytics.pending_reports) || 0
-    const totalGrossRevenue = Number(analytics.total_gross_revenue) || 0
-    const totalNetRevenue = Number(analytics.total_net_revenue) || 0
-
-    // Get daily data using optimized function
-    const { data: dailyAnalyticsData, error: dailyAnalyticsError } = await supabaseAdmin
-      .rpc('get_daily_analytics_data', {
-        p_start_date: startDate,
-        p_end_date: endDate,
-        p_venue_id: venueId || null
-      })
-
-    if (dailyAnalyticsError) {
-      console.error('Daily analytics function error:', dailyAnalyticsError)
-      throw dailyAnalyticsError
+    if (userRole !== 'admin' && userRole !== 'owner') {
+      return NextResponse.json({ error: 'Access denied. Only administrators can view analytics.' }, { status: 403 })
     }
 
     const startStr = toDateOnly(startDate)
     const endStr = toDateOnly(endDate)
 
-    // Today's cash from raw report rows (retrospective: same formula for all historical data)
+    const cacheKey = generateCacheKey('financial-report-v2', {
+      startDate: startStr,
+      endDate: endStr,
+      venueId: venueId || 'all',
+    })
+
+    const cached = cache.get(cacheKey)
+    if (cached) return NextResponse.json(cached)
+
     const PAGE = 1000
     let offset = 0
-    const reportCashRows: Array<{
-      for_date: string
-      cash: number | null
-      flavor: number | null
-      cash_deposits: number | null
-      total_sale_with_special_payment: number | null
-    }> = []
+    const reports: Array<ApprovedReportRow & { id: string; venue_id: string; status: string }> = []
+
     for (;;) {
-      let q = supabaseAdmin
+      let q = admin
         .from('daily_reports')
-        .select('for_date, cash, flavor, cash_deposits, total_sale_with_special_payment')
+        .select(REPORT_FIELDS)
         .gte('for_date', startStr)
         .lte('for_date', endStr)
+        .eq('status', 'approved')
         .order('for_date')
         .range(offset, offset + PAGE - 1)
-      if (venueId) {
-        q = q.eq('venue_id', venueId)
-      }
-      const { data: chunk, error: cashRowsError } = await q
-      if (cashRowsError) {
-        console.error('daily_reports fetch for today\'s cash:', cashRowsError)
-        throw cashRowsError
-      }
-      if (!chunk?.length) break
-      reportCashRows.push(...chunk)
-      if (chunk.length < PAGE) break
+
+      if (venueId) q = q.eq('venue_id', venueId)
+
+      const { data, error } = await q
+      if (error) throw error
+      if (!data?.length) break
+      reports.push(...(data as typeof reports))
+      if (data.length < PAGE) break
       offset += PAGE
     }
 
-    const todaysCashByDate = new Map<string, number>()
-    let totalTodaysCash = 0
-    for (const row of reportCashRows) {
-      const v = getTodaysCash(row)
-      totalTodaysCash += v
-      const d = row.for_date?.slice(0, 10) ?? ''
-      if (!d) continue
-      todaysCashByDate.set(d, (todaysCashByDate.get(d) || 0) + v)
+    const reportIds = reports.map((r) => r.id)
+    const extrasByReport = new Map<
+      string,
+      { tableWithdrawals: number; serviceKwotowy: number; representacja1: number }
+    >()
+
+    for (const id of reportIds) {
+      extrasByReport.set(id, { tableWithdrawals: 0, serviceKwotowy: 0, representacja1: 0 })
     }
 
-    // Calculate total withdrawals from daily data
-    const totalWithdrawals = dailyAnalyticsData?.reduce((sum: number, day: { withdrawals: number }) => sum + (Number(day.withdrawals) || 0), 0) || 0
-
-    // Calculate averages based on actual days with data, not total date range
-    const daysWithData = dailyAnalyticsData?.filter((day: { gross_sales: number }) => Number(day.gross_sales) > 0).length || 1
-    const averageDailySales = totalGrossSales / daysWithData
-    const averageDailyWithdrawals = totalWithdrawals / daysWithData
-    const averageDailyGrossRevenue = totalGrossRevenue / daysWithData
-    const averageDailyNetRevenue = totalNetRevenue / daysWithData
-    const averageDailyTodaysCash = totalTodaysCash / daysWithData
-
-    // Prepare daily data for charts
-    const dailyDataMap = new Map<string, {
-      date: string
-      gross_sales: number
-      withdrawals: number
-      tips: number
-      voids: number
-      loss: number
-      gross_revenue: number
-      net_revenue: number
-      todays_cash: number
-    }>()
-
-    // Initialize daily data map with all dates in range
-    const currentDate = new Date(startDate)
-    const endDateTime = new Date(endDate)
-    while (currentDate <= endDateTime) {
-      const dateStr = currentDate.toISOString().split('T')[0]
-      dailyDataMap.set(dateStr, {
-        date: dateStr,
-        gross_sales: 0,
-        withdrawals: 0,
-        tips: 0,
-        voids: 0,
-        loss: 0,
-        gross_revenue: 0,
-        net_revenue: 0,
-        todays_cash: 0
-      })
-      currentDate.setDate(currentDate.getDate() + 1)
+    const loadExtras = async (
+      table: 'report_withdrawals' | 'report_service_kwotowy' | 'report_representacja_1',
+      field: 'tableWithdrawals' | 'serviceKwotowy' | 'representacja1'
+    ) => {
+      if (!reportIds.length) return
+      const CHUNK = 200
+      for (let i = 0; i < reportIds.length; i += CHUNK) {
+        const chunk = reportIds.slice(i, i + CHUNK)
+        const { data, error } = await admin
+          .from(table)
+          .select('report_id, amount')
+          .in('report_id', chunk)
+        if (error) throw error
+        for (const row of data ?? []) {
+          const entry = extrasByReport.get(row.report_id)
+          if (entry) entry[field] += Number(row.amount) || 0
+        }
+      }
     }
 
-    // Populate daily data from database function results
-    dailyAnalyticsData?.forEach((day: { date: string; gross_sales: number; tips: number; voids: number; loss: number; withdrawals: number; gross_revenue: number; net_revenue: number }) => {
-      const dateStr = day.date
-      const dayData = dailyDataMap.get(dateStr)
-      if (dayData) {
-        dayData.gross_sales = Number(day.gross_sales) || 0
-        dayData.tips = Number(day.tips) || 0
-        dayData.voids = Number(day.voids) || 0
-        dayData.loss = Number(day.loss) || 0
-        dayData.withdrawals = Number(day.withdrawals) || 0
-        dayData.gross_revenue = Number(day.gross_revenue) || 0
-        dayData.net_revenue = Number(day.net_revenue) || 0
-      }
-    })
+    await Promise.all([
+      loadExtras('report_withdrawals', 'tableWithdrawals'),
+      loadExtras('report_service_kwotowy', 'serviceKwotowy'),
+      loadExtras('report_representacja_1', 'representacja1'),
+    ])
 
-    todaysCashByDate.forEach((amount, dateStr) => {
-      const dayData = dailyDataMap.get(dateStr)
-      if (dayData) {
-        dayData.todays_cash = amount
-      }
-    })
+    const { data: venues } = await admin
+      .from('venues')
+      .select('id, name')
+      .eq('is_active', true)
 
-    const dailyData = Array.from(dailyDataMap.values()).sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
+    const venueNames = new Map((venues ?? []).map((v) => [v.id, v.name]))
+
+    const summary = emptyFinancialTotals()
+    const byDate = new Map<string, ReturnType<typeof emptyFinancialTotals>>()
+    const byVenue = new Map<string, ReturnType<typeof emptyFinancialTotals>>()
+
+    for (const report of reports) {
+      const extras = extrasByReport.get(report.id)
+      sumReportRow(summary, report, extras)
+      sumReportRow(
+        byDate.get(report.for_date.slice(0, 10)) ?? (() => {
+          const t = emptyFinancialTotals()
+          byDate.set(report.for_date.slice(0, 10), t)
+          return t
+        })(),
+        report,
+        extras
+      )
+      sumReportRow(
+        byVenue.get(report.venue_id) ?? (() => {
+          const t = emptyFinancialTotals()
+          byVenue.set(report.venue_id, t)
+          return t
+        })(),
+        report,
+        extras
+      )
+    }
+
+    finalizeFinancialTotals(summary)
+
+    const dailyFinancial: FinancialPeriodRow[] = Array.from(byDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, totals]) => ({
+        date,
+        ...finalizeFinancialTotals({ ...totals }),
+      }))
+
+    const toDateTotals = (r: FinancialPeriodRow) => {
+      const { date, ...totals } = r
+      return { date, totals }
+    }
+
+    const weeklyFinancial = aggregateFinancialByDate(
+      dailyFinancial.map(toDateTotals),
+      'weekly'
+    )
+    const monthlyFinancial = aggregateFinancialByDate(
+      dailyFinancial.map(toDateTotals),
+      'monthly'
     )
 
-    const result = {
-      totalGrossSales,
-      totalWithdrawals,
-      totalTips,
-      totalVoids,
-      totalLoss,
-      averageDailySales,
-      averageDailyWithdrawals,
-      totalGrossRevenue,
-      totalNetRevenue,
-      averageDailyGrossRevenue,
-      averageDailyNetRevenue,
-      totalTodaysCash,
-      averageDailyTodaysCash,
-      totalReports,
-      approvedReports: approvedReportsCount,
-      pendingReports,
-      dailyData
+    const venueFinancial: VenueFinancialRow[] = Array.from(byVenue.entries())
+      .map(([venueIdKey, totals]) => ({
+        venueId: venueIdKey,
+        venueName: venueNames.get(venueIdKey) ?? 'Unknown venue',
+        ...finalizeFinancialTotals({ ...totals }),
+      }))
+      .sort((a, b) => a.venueName.localeCompare(b.venueName))
+
+    if (!venueId) {
+      for (const v of venues ?? []) {
+        if (!byVenue.has(v.id)) {
+          venueFinancial.push({
+            venueId: v.id,
+            venueName: v.name,
+            ...emptyFinancialTotals(),
+          })
+        }
+      }
+      venueFinancial.sort((a, b) => a.venueName.localeCompare(b.venueName))
     }
 
-    // Cache the result for 5 minutes
-    cache.set(cacheKey, result, 5 * 60 * 1000)
+    const { count: totalReports } = await admin
+      .from('daily_reports')
+      .select('*', { count: 'exact', head: true })
+      .gte('for_date', startStr)
+      .lte('for_date', endStr)
+      .match(venueId ? { venue_id: venueId } : {})
 
+    const { count: pendingReports } = await admin
+      .from('daily_reports')
+      .select('*', { count: 'exact', head: true })
+      .gte('for_date', startStr)
+      .lte('for_date', endStr)
+      .in('status', ['draft', 'submitted'])
+      .match(venueId ? { venue_id: venueId } : {})
+
+    let cashReportSummary = {
+      reportCount: 0,
+      totalOpening: 0,
+      totalClosing: 0,
+      totalIncome: 0,
+      totalExpense: 0,
+      netMovement: 0,
+    }
+
+    let cashQ = admin
+      .from('cash_reports')
+      .select('id, cash_from_previous_day')
+      .gte('for_date', startStr)
+      .lte('for_date', endStr)
+
+    if (venueId) cashQ = cashQ.eq('venue_id', venueId)
+
+    const { data: cashReports } = await cashQ
+    const cashIds = (cashReports ?? []).map((r) => r.id)
+
+    if (cashIds.length > 0) {
+      const { data: lines } = await admin
+        .from('cash_report_lines')
+        .select('cash_report_id, income, expense')
+        .in('cash_report_id', cashIds)
+
+      let totalIncome = 0
+      let totalExpense = 0
+      for (const line of lines ?? []) {
+        totalIncome += Number(line.income) || 0
+        totalExpense += Number(line.expense) || 0
+      }
+
+      let totalOpening = 0
+      let totalClosing = 0
+      for (const cr of cashReports ?? []) {
+        const opening = Number(cr.cash_from_previous_day) || 0
+        const reportLines = (lines ?? []).filter((l) => l.cash_report_id === cr.id)
+        const closing = opening + netFromLines(reportLines)
+        totalOpening += opening
+        totalClosing += closing
+      }
+
+      cashReportSummary = {
+        reportCount: cashIds.length,
+        totalOpening,
+        totalClosing,
+        totalIncome,
+        totalExpense,
+        netMovement: totalIncome - totalExpense,
+      }
+    }
+
+    const daysWithData = dailyFinancial.filter((d) => d.grossRevenue > 0).length || 1
+
+    const legacyDaily = dailyFinancial.map((d) => ({
+      date: d.date,
+      gross_sales: d.grossSales,
+      gross_revenue: d.grossRevenue,
+      net_revenue: d.netRevenue,
+      withdrawals: d.tableWithdrawals + d.lineWithdrawals,
+      todays_cash: d.todaysCash,
+      tips: 0,
+      voids: 0,
+      loss: 0,
+    }))
+
+    const result = {
+      periodStart: startStr,
+      periodEnd: endStr,
+      daysInRange: legacyDaily.length,
+      daysWithReportData: daysWithData,
+      totalReports: totalReports ?? 0,
+      approvedReports: summary.reportCount,
+      pendingReports: pendingReports ?? 0,
+      summary: finalizeFinancialTotals(summary),
+      paymentMix: buildPaymentMix(summary),
+      operatingCosts: buildOperatingCosts(summary),
+      averages: {
+        grossSales: summary.grossSales / daysWithData,
+        grossRevenue: summary.grossRevenue / daysWithData,
+        netRevenue: summary.netRevenue / daysWithData,
+        todaysCash: summary.todaysCash / daysWithData,
+      },
+      venueFinancial,
+      dailyFinancial,
+      weeklyFinancial,
+      monthlyFinancial,
+      cashReportSummary,
+      // legacy fields for any older consumers
+      totalGrossSales: summary.grossSales,
+      totalGrossRevenue: summary.grossRevenue,
+      totalNetRevenue: summary.netRevenue,
+      totalWithdrawals: summary.tableWithdrawals + summary.lineWithdrawals,
+      totalTodaysCash: summary.todaysCash,
+      dailyData: legacyDaily,
+      weeklyData: aggregateAnalyticsByPeriod(legacyDaily, 'weekly'),
+      monthlyData: aggregateAnalyticsByPeriod(legacyDaily, 'monthly'),
+      venueBreakdown: venueFinancial.map((v) => ({
+        venueId: v.venueId,
+        venueName: v.venueName,
+        totalGrossSales: v.grossSales,
+        totalGrossRevenue: v.grossRevenue,
+        totalNetRevenue: v.netRevenue,
+        totalReports: v.reportCount,
+        approvedReports: v.reportCount,
+      })),
+    }
+
+    cache.set(cacheKey, result, 5 * 60 * 1000)
     return NextResponse.json(result)
   } catch (error: unknown) {
-    console.error('Error fetching analytics:', error)
-    console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : undefined
-    })
+    console.error('Error fetching financial report:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch analytics data' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch financial report' },
       { status: 500 }
     )
   }

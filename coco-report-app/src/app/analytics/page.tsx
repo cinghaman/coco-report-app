@@ -78,7 +78,7 @@ export default function AnalyticsPage() {
   }
 
   // Check if user is admin
-  if (user.role !== 'admin') {
+  if (user.role !== 'admin' && user.role !== 'owner') {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header user={user} />
