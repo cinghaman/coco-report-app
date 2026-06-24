@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { User, Venue, DailyReport, ReportStatus } from '@/lib/supabase'
 import { getTodaysCash } from '@/lib/todays-cash'
-import { getVenueNotificationEmails } from '@/lib/report-notifications'
+import { getVenueNotificationEmails, venueEmailFromName, venueNameFromJoinedRow, fetchVenueNameById } from '@/lib/report-notifications'
 import { filterVenuesForUser } from '@/lib/venue-access'
 
 interface EODFormProps {
@@ -545,7 +545,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
           .from('daily_reports')
           .update(reportData)
           .eq('id', initialData.id)
-          .select()
+          .select('*, venues(name)')
           .single()
 
         data = result.data
@@ -560,7 +560,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
         const result = await supabase
           .from('daily_reports')
           .insert([reportData])
-          .select()
+          .select('*, venues(name)')
           .single()
 
         data = result.data
@@ -573,8 +573,10 @@ export default function EODForm({ user, initialData }: EODFormProps) {
       // Only send for submitted reports to avoid spam
       if (data.id && status === 'submitted') {
         try {
-          const venue = venues.find(v => v.id === formData.venue_id)
-          const venueName = venue?.name || 'Unknown Venue'
+          const venueIdForEmail = data.venue_id as string
+          const venueName =
+            venueNameFromJoinedRow(data as { venues?: { name: string } | null }) ||
+            (await fetchVenueNameById(supabase, venueIdForEmail))
 
           const { data: adminUsers, error: adminError } = await supabase
             .from('users')
@@ -585,10 +587,10 @@ export default function EODForm({ user, initialData }: EODFormProps) {
             console.error('Error fetching admin emails:', adminError)
           }
 
-          const recipientEmails = getVenueNotificationEmails(adminUsers ?? [], formData.venue_id)
+          const recipientEmails = getVenueNotificationEmails(adminUsers ?? [], venueIdForEmail)
 
           console.log('Report creation notification - venue-scoped recipients:', {
-            venueId: formData.venue_id,
+            venueId: venueIdForEmail,
             venueName,
             recipientEmails,
             adminUsersFound: adminUsers?.length || 0,
@@ -653,7 +655,8 @@ export default function EODForm({ user, initialData }: EODFormProps) {
               body: JSON.stringify({
                 to: recipientEmails,
                 subject: subject,
-                html: body
+                html: body,
+                fromName: venueEmailFromName(venueName),
               }),
             })
 

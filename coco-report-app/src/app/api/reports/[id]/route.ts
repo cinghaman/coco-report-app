@@ -3,7 +3,7 @@ import { createServerSupabaseClient } from '@/lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import Mailgun from 'mailgun.js'
 import FormData from 'form-data'
-import { getVenueNotificationEmails } from '@/lib/report-notifications'
+import { getVenueNotificationEmails, venueEmailFromName } from '@/lib/report-notifications'
 
 export async function DELETE(
   request: NextRequest,
@@ -160,7 +160,7 @@ export async function DELETE(
           if (mailgunApiKey) {
             const mailgunDomain = process.env.MAILGUN_DOMAIN || 'coco-notifications.info'
             const fromEmail = process.env.MAILGUN_FROM_EMAIL || `postmaster@${mailgunDomain}`
-            const fromName = process.env.MAILGUN_FROM_NAME || 'Coco Reporting'
+            const fromName = venueEmailFromName(venueName)
 
             const mailgun = new Mailgun(FormData)
             const mg = mailgun.client({

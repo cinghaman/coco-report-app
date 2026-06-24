@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { to, subject, html, text } = body
+    const { to, subject, html, text, fromName: customFromName } = body
 
     if (!to || !subject || (!html && !text)) {
       return NextResponse.json({ error: 'Missing required fields: to, subject, and html or text' }, { status: 400 })
@@ -34,7 +34,10 @@ export async function POST(request: NextRequest) {
     // Get Mailgun domain from environment or use default
     const mailgunDomain = process.env.MAILGUN_DOMAIN || 'coco-notifications.info'
     const fromEmail = process.env.MAILGUN_FROM_EMAIL || `postmaster@${mailgunDomain}`
-    const fromName = process.env.MAILGUN_FROM_NAME || 'Coco Reporting'
+    const fromName =
+      (typeof customFromName === 'string' && customFromName.trim()) ||
+      process.env.MAILGUN_FROM_NAME ||
+      'Coco Reporting'
 
     // Initialize Mailgun
     const mailgun = new Mailgun(FormData)

@@ -10,7 +10,7 @@ import {
   fetchOpeningCashForNewReport,
   netFromLines,
 } from '@/lib/cash-report'
-import { getVenueNotificationEmails } from '@/lib/report-notifications'
+import { getVenueNotificationEmails, venueEmailFromName, fetchVenueNameById } from '@/lib/report-notifications'
 import { filterVenuesForUser } from '@/lib/venue-access'
 
 export type LineDraft = {
@@ -191,8 +191,6 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
       return
     }
 
-    const selectedVenueName =
-      venueName || venues.find((v) => v.id === venueId)?.name || 'Unknown venue'
     setSaving(true)
     setError(null)
     try {
@@ -256,6 +254,8 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
 
       // Notify admins / owners (same distribution as EOD reports)
       try {
+        const resolvedVenueName = await fetchVenueNameById(supabase, venueId)
+
         const { data: adminUsers, error: adminError } = await supabase
           .from('users')
           .select('email, display_name, role, venue_ids')
@@ -273,7 +273,7 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
           console.log('Cash report email: no admins assigned to this venue; skipping.')
         } else {
         const action = isEdit ? 'Updated' : 'Created'
-        const subject = `Cash Report ${action} - ${selectedVenueName} - ${forDate}`
+        const subject = `Cash Report ${action} - ${resolvedVenueName} - ${forDate}`
         const closing = closingCash(cashFromPrevious, lines)
 
         const rowsHtml = lines
@@ -291,7 +291,7 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
 
         const html = `
           <h2>Cash Report ${action}</h2>
-          <p><strong>Venue:</strong> ${escapeHtml(selectedVenueName)}</p>
+          <p><strong>Venue:</strong> ${escapeHtml(resolvedVenueName)}</p>
           <p><strong>Date:</strong> ${forDate}</p>
           <p><strong>${action} by:</strong> ${escapeHtml(user.display_name || user.email)}</p>
           <p><strong>Cash from previous day:</strong> ${formatMoney(cashFromPrevious)}</p>
@@ -321,7 +321,12 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
         const emailResponse = await fetch('/api/send-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: recipientEmails, subject, html }),
+          body: JSON.stringify({
+            to: recipientEmails,
+            subject,
+            html,
+            fromName: venueEmailFromName(resolvedVenueName),
+          }),
         })
         const emailResult = await emailResponse.json()
         if (emailResponse.ok) {
