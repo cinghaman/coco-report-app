@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
 
     console.log('Email notification request:', {
       subject,
+      fromName,
       recipients: recipients,
       recipientCount: recipients.length,
       authenticatedUser: user.email

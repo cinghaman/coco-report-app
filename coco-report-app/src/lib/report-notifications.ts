@@ -8,9 +8,21 @@ export type VenueNotificationUser = {
 
 const VENUE_NOTIFICATION_ROLES = new Set(['admin', 'owner'])
 
-/** Display name for the email From header — e.g. "Thai Varso". */
+/** Per-venue email sender display names (From header). */
+const VENUE_REPORTING_SENDER: Record<string, string> = {
+  'coco lounge': 'Coco Reporting',
+  'thai varso': 'Thai Varso Reporting',
+}
+
+/** Display name for the email From header — e.g. "Thai Varso Reporting". */
 export function venueEmailFromName(venueName: string): string {
-  return venueName.trim() || 'Coco Reporting'
+  const trimmed = venueName.trim()
+  if (!trimmed) return 'Coco Reporting'
+
+  const mapped = VENUE_REPORTING_SENDER[trimmed.toLowerCase()]
+  if (mapped) return mapped
+
+  return `${trimmed} Reporting`
 }
 
 /** Resolve venue label from DB (avoids stale client state). */
