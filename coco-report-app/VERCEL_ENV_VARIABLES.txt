@@ -27,6 +27,11 @@ MAILGUN_API_URL=https://api.eu.mailgun.net
 MAILGUN_FROM_EMAIL=postmaster@coco-notifications.info
 MAILGUN_FROM_NAME=Coco Reporting
 
+# Cron (end-of-month reports) — set a long random secret in Vercel.
+# Vercel Cron calls GET /api/cron/monthly-reports on the 1st of each month (07:00 UTC)
+# with Authorization: Bearer <CRON_SECRET>
+CRON_SECRET=replace_with_a_long_random_secret
+
 # ============================================
 # IMPORTANT NOTES:
 # ============================================
@@ -38,6 +43,9 @@ MAILGUN_FROM_NAME=Coco Reporting
 # 3. After adding variables, REDEPLOY your application
 #
 # 4. Select all three environments (Production, Preview, Development)
+#
+# 5. Add CRON_SECRET so scheduled monthly venue reports can run securely
+# ============================================
 #    when adding each variable
 # ============================================
 

@@ -124,6 +124,8 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
   const [error, setError] = useState<string | null>(null)
   const [venues, setVenues] = useState<Venue[]>([])
   const [selectedVenueId, setSelectedVenueId] = useState<string>('all')
+  const [sendingMonthly, setSendingMonthly] = useState(false)
+  const [monthlyNotice, setMonthlyNotice] = useState<string | null>(null)
   const [groupBy, setGroupBy] = useState<AnalyticsGroupBy>('daily')
 
   const getDateRange = () => {
@@ -289,6 +291,38 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
 
   const formatPeriod = (dateString: string) => formatPeriodLabel(dateString, groupBy)
 
+  const sendMonthlyReports = async () => {
+    setSendingMonthly(true)
+    setMonthlyNotice(null)
+    try {
+      const response = await fetch('/api/cron/monthly-reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          venueId: selectedVenueId === 'all' ? undefined : selectedVenueId,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send monthly reports')
+      }
+
+      const sent = (data.results ?? []).filter(
+        (r: { emailsSent?: number }) => (r.emailsSent ?? 0) > 0
+      ).length
+      const skipped = (data.results ?? []).filter(
+        (r: { skipped?: string }) => Boolean(r.skipped)
+      ).length
+      setMonthlyNotice(
+        `End of month emails for ${data.month}: ${sent} venue(s) sent, ${skipped} skipped. Only assigned admins/owners receive each venue's report.`
+      )
+    } catch (err: unknown) {
+      setMonthlyNotice(err instanceof Error ? err.message : 'Failed to send monthly reports')
+    } finally {
+      setSendingMonthly(false)
+    }
+  }
+
   const s = reportData?.summary
   const totalWithdrawals =
     (s?.tableWithdrawals ?? 0) + (s?.lineWithdrawals ?? 0)
@@ -414,6 +448,34 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
               )}
             </div>
           </div>
+        </div>
+
+        <div className="bg-white shadow rounded-lg p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-medium text-gray-900">End of month email</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                Sends a short MoM summary for{' '}
+                {selectedVenueId === 'all'
+                  ? 'each venue you can access'
+                  : venues.find((v) => v.id === selectedVenueId)?.name ?? 'the selected venue'}
+                . Recipients are only admins/owners assigned to that venue.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={sendMonthlyReports}
+              disabled={sendingMonthly || venues.length === 0}
+              className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sendingMonthly ? 'Sending...' : "Send last month's report"}
+            </button>
+          </div>
+          {monthlyNotice && (
+            <p className="mt-3 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+              {monthlyNotice}
+            </p>
+          )}
         </div>
 
         {dateRange === 'custom' && (!customStartDate || !customEndDate) && (

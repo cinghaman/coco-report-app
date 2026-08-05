@@ -39,7 +39,6 @@ openapi.yaml
 
 # Deployment files
 .deployignore
-vercel.json
 
 # Build artifacts
 .next/

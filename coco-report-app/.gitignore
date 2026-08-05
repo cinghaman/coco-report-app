@@ -56,4 +56,3 @@ openapi.yaml
 
 # deployment files
 .deployignore
-vercel.json
