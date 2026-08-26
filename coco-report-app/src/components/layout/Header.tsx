@@ -8,6 +8,10 @@ import { useRouter } from 'next/navigation'
 
 import { canUseCashReports } from '@/lib/venue-access'
 
+interface HeaderProps {
+  user?: User | null
+}
+
 export default function Header({ user }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const router = useRouter()

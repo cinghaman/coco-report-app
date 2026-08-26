@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import type { User, DailyReport, Venue, CashReport } from '@/lib/supabase'
 import { getTodaysCash } from '@/lib/todays-cash'
 import { isHiddenFromDashboard } from '@/lib/dashboard-venue-filter'
-import { filterVenuesForUser, userHasFullVenueAccess, canUseCashReports, canDeleteCashReports } from '@/lib/venue-access'
+import { filterVenuesForUser, userHasFullVenueAccess, canUseCashReports, canDeleteCashReports, canSeeFinancialTotals } from '@/lib/venue-access'
 import { lineNetByCashReportId } from '@/lib/cash-report'
 import Link from 'next/link'
 
@@ -45,6 +45,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
   const canSeeCashReports = canUseCashReports(user)
   const canAccessAllVenues = userHasFullVenueAccess(user)
   const canDeleteReports = canDeleteCashReports(user)
+  const canSeeTotals = canSeeFinancialTotals(user)
   const META_LIMIT = 2000
 
   // Delete confirmation state (daily vs cash report APIs)
@@ -266,17 +267,21 @@ export default function DashboardContent({ user }: DashboardContentProps) {
 
         if (approvedError) throw approvedError
 
-        // Get gross and net revenue for approved reports only
-        const { data: revenueData, error: revenueError } = await supabase
-          .from('daily_reports')
-          .select('gross_revenue, net_revenue')
-          .eq('venue_id', venue.id)
-          .eq('status', 'approved')
+        // Get gross and net revenue for approved reports only (admins/owners)
+        let totalGrossRevenue = 0
+        let totalNetRevenue = 0
+        if (canSeeTotals) {
+          const { data: revenueData, error: revenueError } = await supabase
+            .from('daily_reports')
+            .select('gross_revenue, net_revenue')
+            .eq('venue_id', venue.id)
+            .eq('status', 'approved')
 
-        if (revenueError) throw revenueError
+          if (revenueError) throw revenueError
 
-        const totalGrossRevenue = revenueData?.reduce((sum, r) => sum + (r.gross_revenue || 0), 0) || 0
-        const totalNetRevenue = revenueData?.reduce((sum, r) => sum + (r.net_revenue || 0), 0) || 0
+          totalGrossRevenue = revenueData?.reduce((sum, r) => sum + (r.gross_revenue || 0), 0) || 0
+          totalNetRevenue = revenueData?.reduce((sum, r) => sum + (r.net_revenue || 0), 0) || 0
+        }
 
         venueStatsMap[venue.id] = {
           totalReports: totalReports || 0,
@@ -293,7 +298,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
     } finally {
       setLoading(false)
     }
-  }, [user.role, user.venue_ids, currentPage, canSeeCashReports, canAccessAllVenues])
+  }, [user.role, user.venue_ids, currentPage, canSeeCashReports, canAccessAllVenues, canSeeTotals])
 
   useEffect(() => {
     fetchDashboardData()
@@ -445,6 +450,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                         </p>
                       </div>
                     </div>
+                    {canSeeTotals && (
                     <div className="text-right">
                       <div className="text-xl font-bold text-emerald-600">
                         {formatCurrency(stats.totalGrossRevenue)} gross
@@ -453,6 +459,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                         {formatCurrency(stats.totalNetRevenue)} net
                       </div>
                     </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -527,13 +534,17 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                         </div>
                         <div className="flex items-center gap-4 flex-shrink-0">
                           <div className="text-right">
-                            <div className="text-sm font-medium text-gray-900">
-                              {formatCurrency(row.report.gross_revenue || 0)} gross
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {formatCurrency(row.report.net_revenue || 0)} net
-                            </div>
-                            <div className="text-xs text-gray-400">
+                            {canSeeTotals ? (
+                              <>
+                                <div className="text-sm font-medium text-gray-900">
+                                  {formatCurrency(row.report.gross_revenue || 0)} gross
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {formatCurrency(row.report.net_revenue || 0)} net
+                                </div>
+                              </>
+                            ) : null}
+                            <div className={`text-xs ${canSeeTotals ? 'text-gray-400' : 'text-sm font-medium text-gray-900'}`}>
                               {formatCurrency(getTodaysCash(row.report))} today&apos;s cash
                             </div>
                           </div>

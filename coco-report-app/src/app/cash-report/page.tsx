@@ -12,6 +12,8 @@ import { getVenueScopeIds, canUseCashReports, canDeleteCashReports } from '@/lib
 const fmt = (n: number) =>
   new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(n)
 
+const PAGE_SIZE = 10
+
 type CashReportRow = {
   id: string
   for_date: string
@@ -28,6 +30,8 @@ export default function CashReportListPage() {
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<CashReportRow[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   const [deleteConfirm, setDeleteConfirm] = useState<{
     show: boolean
     id: string | null
@@ -37,31 +41,40 @@ export default function CashReportListPage() {
 
   const allowed = (u: User) => canUseCashReports(u)
   const canDelete = profile ? canDeleteCashReports(profile) : false
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
   const formatRowDate = (forDate: string) =>
     new Date(forDate + 'T12:00:00').toLocaleDateString('pl-PL')
 
-  const fetchList = useCallback(async (userProfile: User) => {
+  const fetchList = useCallback(async (userProfile: User, page: number) => {
     if (!supabase) return
     setLoadError(null)
     const scopeIds = getVenueScopeIds(userProfile)
     if (scopeIds && scopeIds.length === 0) {
       setRows([])
+      setTotalCount(0)
       return
     }
+
+    const from = (page - 1) * PAGE_SIZE
+    const to = from + PAGE_SIZE - 1
+
     let query = supabase
       .from('cash_reports')
-      .select('id, for_date, cash_from_previous_day, created_at, venues(name)')
+      .select('id, for_date, cash_from_previous_day, created_at, venues(name)', { count: 'exact' })
       .order('for_date', { ascending: false })
-      .limit(100)
+      .range(from, to)
     if (scopeIds) {
       query = query.in('venue_id', scopeIds)
     }
-    const { data, error } = await query
+    const { data, error, count } = await query
     if (error) {
       setLoadError(error.message)
       return
     }
+
+    setTotalCount(count ?? 0)
+
     const list = (data ?? []).map((row) => {
       const joinedVenue = row.venues as { name: string } | null
       const { venues: _venues, ...rest } = row as {
@@ -102,7 +115,9 @@ export default function CashReportListPage() {
   useEffect(() => {
     ;(async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
         if (!session) {
           router.replace('/login')
           return
@@ -121,12 +136,16 @@ export default function CashReportListPage() {
           return
         }
         setProfile(userProfile)
-        await fetchList(userProfile)
       } finally {
         setLoading(false)
       }
     })()
-  }, [router, fetchList])
+  }, [router])
+
+  useEffect(() => {
+    if (!profile) return
+    fetchList(profile, currentPage)
+  }, [currentPage, profile, fetchList])
 
   const openDelete = (e: React.MouseEvent, id: string, forDate: string) => {
     e.preventDefault()
@@ -145,13 +164,24 @@ export default function CashReportListPage() {
       const res = await fetch(`/api/cash-reports/${deleteConfirm.id}`, { method: 'DELETE' })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error((body as { error?: string }).error || 'Delete failed')
-      if (profile) await fetchList(profile)
+      if (profile) {
+        const nextCount = Math.max(0, totalCount - 1)
+        const nextPages = Math.max(1, Math.ceil(nextCount / PAGE_SIZE))
+        const page = Math.min(currentPage, nextPages)
+        if (page !== currentPage) setCurrentPage(page)
+        else await fetchList(profile, page)
+      }
       setDeleteConfirm({ show: false, id: null, dateLabel: null })
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Delete failed')
     } finally {
       setDeleting(false)
     }
+  }
+
+  const goToPage = (page: number) => {
+    if (page < 1 || page > totalPages) return
+    setCurrentPage(page)
   }
 
   if (loading || !profile) {
@@ -161,6 +191,9 @@ export default function CashReportListPage() {
       </div>
     )
   }
+
+  const showingFrom = totalCount === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
+  const showingTo = Math.min(currentPage * PAGE_SIZE, totalCount)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -189,7 +222,8 @@ export default function CashReportListPage() {
               <p className="mt-1">{loadError}</p>
               <p className="mt-2 text-xs text-amber-800">
                 If tables are missing, create <code className="bg-amber-100 px-1 rounded">cash_reports</code> and{' '}
-                <code className="bg-amber-100 px-1 rounded">cash_report_lines</code> with RLS in the Supabase SQL editor.
+                <code className="bg-amber-100 px-1 rounded">cash_report_lines</code> with RLS in the Supabase SQL
+                editor.
               </p>
             </div>
           )}
@@ -229,25 +263,112 @@ export default function CashReportListPage() {
                     </div>
                   </Link>
                   {canDelete && (
-                  <button
-                    type="button"
-                    onClick={(e) => openDelete(e, r.id, r.for_date)}
-                    className="flex-shrink-0 self-center p-2 mr-2 sm:mr-4 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
-                    title="Delete cash report"
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={(e) => openDelete(e, r.id, r.for_date)}
+                      className="flex-shrink-0 self-center p-2 mr-2 sm:mr-4 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
+                      title="Delete cash report"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    </button>
                   )}
                 </li>
               ))}
             </ul>
+
+            {totalCount > PAGE_SIZE && (
+              <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                <div className="flex-1 flex justify-between sm:hidden">
+                  <button
+                    type="button"
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm text-gray-700">
+                      Showing <span className="font-medium">{showingFrom}</span> to{' '}
+                      <span className="font-medium">{showingTo}</span> of{' '}
+                      <span className="font-medium">{totalCount}</span> results
+                    </p>
+                  </div>
+                  <div>
+                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                      <button
+                        type="button"
+                        onClick={() => goToPage(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span className="sr-only">Previous</span>
+                        <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <path
+                            fillRule="evenodd"
+                            d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum: number
+                        if (totalPages <= 5) pageNum = i + 1
+                        else if (currentPage <= 3) pageNum = i + 1
+                        else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i
+                        else pageNum = currentPage - 2 + i
+                        return (
+                          <button
+                            type="button"
+                            key={pageNum}
+                            onClick={() => goToPage(pageNum)}
+                            className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                              pageNum === currentPage
+                                ? 'z-10 bg-emerald-50 border-emerald-500 text-emerald-700'
+                                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        )
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => goToPage(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span className="sr-only">Next</span>
+                        <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <path
+                            fillRule="evenodd"
+                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                    </nav>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
@@ -276,8 +397,8 @@ export default function CashReportListPage() {
               <div className="mt-2 px-7 py-3">
                 <p className="text-sm text-gray-500 text-center">
                   Are you sure you want to delete this cash report for{' '}
-                  <strong>{deleteConfirm.dateLabel}</strong>? This cannot be undone (all line items will
-                  be removed).
+                  <strong>{deleteConfirm.dateLabel}</strong>? This cannot be undone (all line items will be
+                  removed).
                 </p>
               </div>
               <div className="flex items-center justify-end gap-3 px-4 py-3">

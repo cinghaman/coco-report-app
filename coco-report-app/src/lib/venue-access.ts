@@ -37,6 +37,11 @@ export function canDeleteCashReports(user: Pick<User, 'role'>): boolean {
   return user.role === 'admin' || user.role === 'owner'
 }
 
+/** Gross/net totals and Financial Report — not for staff. */
+export function canSeeFinancialTotals(user: Pick<User, 'role'>): boolean {
+  return user.role === 'admin' || user.role === 'owner'
+}
+
 export function canViewReport(
   user: VenueScopedUser,
   report: { created_by: string; venue_id: string; status: string }
