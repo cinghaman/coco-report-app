@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { User, Venue, DailyReport, ReportStatus } from '@/lib/supabase'
 import { getTodaysCash } from '@/lib/todays-cash'
-import { getVenueNotificationEmails, venueEmailFromName, venueNameFromJoinedRow, fetchVenueNameById } from '@/lib/report-notifications'
+import { venueEmailFromName, venueNameFromJoinedRow, fetchVenueNameById } from '@/lib/report-notifications'
 import { filterVenuesForUser } from '@/lib/venue-access'
 
 interface EODFormProps {
@@ -578,28 +578,6 @@ export default function EODForm({ user, initialData }: EODFormProps) {
             venueNameFromJoinedRow(data as { venues?: { name: string } | null }) ||
             (await fetchVenueNameById(supabase, venueIdForEmail))
 
-          const { data: adminUsers, error: adminError } = await supabase
-            .from('users')
-            .select('email, display_name, role, venue_ids')
-            .in('role', ['admin', 'owner'])
-
-          if (adminError) {
-            console.error('Error fetching admin emails:', adminError)
-          }
-
-          const recipientEmails = getVenueNotificationEmails(adminUsers ?? [], venueIdForEmail)
-
-          console.log('Report creation notification - venue-scoped recipients:', {
-            venueId: venueIdForEmail,
-            venueName,
-            recipientEmails,
-            adminUsersFound: adminUsers?.length || 0,
-            error: adminError?.message,
-          })
-
-          if (recipientEmails.length === 0) {
-            console.log('No admins assigned to this venue for email notifications; skipping email.')
-          } else {
           const action = initialData ? 'Updated' : 'Created'
           const subject = `EOD Report ${action} - ${venueName} - ${formData.for_date}`
 
@@ -643,43 +621,31 @@ export default function EODForm({ user, initialData }: EODFormProps) {
             </p>
             `
 
-          // Use server-side API to send emails (avoids CORS issues)
-          console.log('Sending email notifications to:', recipientEmails)
-          
+          // Recipients resolved server-side (staff cannot read other users via RLS)
           try {
-            const emailResponse = await fetch('/api/send-email', {
+            const emailResponse = await fetch('/api/reports/notify-venue', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                to: recipientEmails,
-                subject: subject,
+                venueId: venueIdForEmail,
+                subject,
                 html: body,
                 fromName: venueEmailFromName(venueName),
               }),
             })
 
             const emailResult = await emailResponse.json()
-            
+
             if (emailResponse.ok) {
-              console.log('Email notifications:', emailResult.message)
-              if (emailResult.results) {
-                emailResult.results.forEach((r: any) => {
-                  if (r.success) {
-                    console.log(`✓ Email sent to ${r.recipient}`)
-                  } else {
-                    console.error(`✗ Failed to send to ${r.recipient}:`, r.error, r.status || '')
-                  }
-                })
-              }
+              console.log('Email notifications:', emailResult.message, emailResult.recipients)
             } else {
               console.error('Failed to send email notifications:', emailResult)
             }
           } catch (emailError) {
             console.error('Error sending email notifications:', emailError)
             // Don't fail the save operation if email fails
-          }
           }
 
         } catch (emailError) {

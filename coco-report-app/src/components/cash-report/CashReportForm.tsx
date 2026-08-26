@@ -10,7 +10,7 @@ import {
   fetchOpeningCashForNewReport,
   netFromLines,
 } from '@/lib/cash-report'
-import { getVenueNotificationEmails, venueEmailFromName, fetchVenueNameById } from '@/lib/report-notifications'
+import { venueEmailFromName, fetchVenueNameById } from '@/lib/report-notifications'
 import { filterVenuesForUser } from '@/lib/venue-access'
 
 export type LineDraft = {
@@ -256,22 +256,6 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
       try {
         const resolvedVenueName = await fetchVenueNameById(supabase, venueId)
 
-        const { data: adminUsers, error: adminError } = await supabase
-          .from('users')
-          .select('email, display_name, role, venue_ids')
-          .in('role', ['admin', 'owner'])
-
-        if (adminError) {
-          console.error('Cash report email: error fetching admin emails:', adminError)
-        }
-
-        const recipientEmails = venueId
-          ? getVenueNotificationEmails(adminUsers ?? [], venueId)
-          : []
-
-        if (recipientEmails.length === 0) {
-          console.log('Cash report email: no admins assigned to this venue; skipping.')
-        } else {
         const action = isEdit ? 'Updated' : 'Created'
         const subject = `Cash Report ${action} - ${resolvedVenueName} - ${forDate}`
         const closing = closingCash(cashFromPrevious, lines)
@@ -318,11 +302,12 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
           </p>
         `
 
-        const emailResponse = await fetch('/api/send-email', {
+        // Recipients resolved server-side (avoids RLS blocking staff/non-admin lookups)
+        const emailResponse = await fetch('/api/reports/notify-venue', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            to: recipientEmails,
+            venueId,
             subject,
             html,
             fromName: venueEmailFromName(resolvedVenueName),
@@ -330,10 +315,9 @@ export default function CashReportForm({ user, reportId }: CashReportFormProps) 
         })
         const emailResult = await emailResponse.json()
         if (emailResponse.ok) {
-          console.log('Cash report email:', emailResult.message)
+          console.log('Cash report email:', emailResult.message, emailResult.recipients)
         } else {
           console.error('Cash report email failed:', emailResult)
-        }
         }
       } catch (emailErr) {
         console.error('Cash report email error:', emailErr)
