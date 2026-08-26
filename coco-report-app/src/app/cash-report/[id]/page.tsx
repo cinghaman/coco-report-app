@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import type { User } from '@/lib/supabase'
 import Header from '@/components/layout/Header'
 import CashReportForm from '@/components/cash-report/CashReportForm'
+import { canUseCashReports, canDeleteCashReports } from '@/lib/venue-access'
 
 export default function EditCashReportPage() {
   const router = useRouter()
@@ -38,7 +39,7 @@ export default function EditCashReportPage() {
         router.replace('/login')
         return
       }
-      if (userProfile.role !== 'admin' && userProfile.role !== 'owner') {
+      if (!canUseCashReports(userProfile)) {
         router.replace('/dashboard')
         return
       }
@@ -87,6 +88,7 @@ export default function EditCashReportPage() {
               </p>
             )}
           </div>
+          {canDeleteCashReports(profile) && (
           <button
             type="button"
             onClick={() => setDeleteConfirm(true)}
@@ -94,6 +96,7 @@ export default function EditCashReportPage() {
           >
             Delete report
           </button>
+          )}
         </div>
         <CashReportForm user={profile} reportId={id} />
       </main>

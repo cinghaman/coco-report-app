@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import type { User } from '@/lib/supabase'
 import Header from '@/components/layout/Header'
 import CashReportForm from '@/components/cash-report/CashReportForm'
+import { canUseCashReports } from '@/lib/venue-access'
 
 export default function NewCashReportPage() {
   const router = useRouter()
@@ -28,7 +29,7 @@ export default function NewCashReportPage() {
         router.replace('/login')
         return
       }
-      if (userProfile.role !== 'admin' && userProfile.role !== 'owner') {
+      if (!canUseCashReports(userProfile)) {
         router.replace('/dashboard')
         return
       }

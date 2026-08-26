@@ -6,9 +6,7 @@ import { supabase } from '@/lib/supabase'
 import type { User } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
-interface HeaderProps {
-  user?: User | null
-}
+import { canUseCashReports } from '@/lib/venue-access'
 
 export default function Header({ user }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -52,7 +50,7 @@ export default function Header({ user }: HeaderProps) {
             >
               New Report
             </Link>
-            {(user?.role === 'admin' || user?.role === 'owner') && (
+            {user && canUseCashReports(user) && (
               <Link
                 href="/cash-report"
                 className="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
@@ -164,7 +162,7 @@ export default function Header({ user }: HeaderProps) {
               >
                 New Report
               </Link>
-              {(user?.role === 'admin' || user?.role === 'owner') && (
+              {user && canUseCashReports(user) && (
                 <Link
                   href="/cash-report"
                   className="text-gray-500 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"

@@ -27,6 +27,16 @@ export function getVenueScopeIds(user: VenueScopedUser): string[] | null {
   return user.venue_ids ?? []
 }
 
+/** Staff, admins, and owners can create/edit cash reports for assigned venues. */
+export function canUseCashReports(user: Pick<User, 'role'>): boolean {
+  return user.role === 'staff' || user.role === 'admin' || user.role === 'owner'
+}
+
+/** Only admins/owners can delete cash reports. */
+export function canDeleteCashReports(user: Pick<User, 'role'>): boolean {
+  return user.role === 'admin' || user.role === 'owner'
+}
+
 export function canViewReport(
   user: VenueScopedUser,
   report: { created_by: string; venue_id: string; status: string }

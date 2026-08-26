@@ -53,7 +53,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Protect app routes - redirect to login if not authenticated
-  const protectedPaths = ['/dashboard', '/reports', '/admin', '/analytics']
+  const protectedPaths = ['/dashboard', '/reports', '/admin', '/analytics', '/cash-report']
   const isProtected = protectedPaths.some((p) => path.startsWith(p))
   if (isProtected && !user) {
     const redirectRes = NextResponse.redirect(new URL('/login', request.url))

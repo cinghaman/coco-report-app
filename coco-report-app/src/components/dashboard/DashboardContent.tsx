@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import type { User, DailyReport, Venue, CashReport } from '@/lib/supabase'
 import { getTodaysCash } from '@/lib/todays-cash'
 import { isHiddenFromDashboard } from '@/lib/dashboard-venue-filter'
-import { filterVenuesForUser, userHasFullVenueAccess } from '@/lib/venue-access'
+import { filterVenuesForUser, userHasFullVenueAccess, canUseCashReports, canDeleteCashReports } from '@/lib/venue-access'
 import { lineNetByCashReportId } from '@/lib/cash-report'
 import Link from 'next/link'
 
@@ -42,9 +42,9 @@ export default function DashboardContent({ user }: DashboardContentProps) {
   const [totalReports, setTotalReports] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const reportsPerPage = 10
-  const canSeeCashReports = user.role === 'admin' || user.role === 'owner'
+  const canSeeCashReports = canUseCashReports(user)
   const canAccessAllVenues = userHasFullVenueAccess(user)
-  const canDeleteDailyReports = canSeeCashReports
+  const canDeleteReports = canDeleteCashReports(user)
   const META_LIMIT = 2000
 
   // Delete confirmation state (daily vs cash report APIs)
@@ -537,7 +537,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                               {formatCurrency(getTodaysCash(row.report))} today&apos;s cash
                             </div>
                           </div>
-                          {canDeleteDailyReports && (
+                          {canDeleteReports && (
                             <button
                               onClick={(e) =>
                                 handleDeleteClick(e, row.report.id, formatDate(row.report.for_date), 'daily')
@@ -595,7 +595,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                         </div>
                       </div>
                     </Link>
-                    {canDeleteDailyReports && (
+                    {canDeleteReports && (
                       <button
                         type="button"
                         onClick={(e) =>

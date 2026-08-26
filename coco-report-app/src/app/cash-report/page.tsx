@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase'
 import type { User } from '@/lib/supabase'
 import Header from '@/components/layout/Header'
 import { lineNetByCashReportId } from '@/lib/cash-report'
-import { getVenueScopeIds } from '@/lib/venue-access'
+import { getVenueScopeIds, canUseCashReports, canDeleteCashReports } from '@/lib/venue-access'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(n)
@@ -35,7 +35,8 @@ export default function CashReportListPage() {
   }>({ show: false, id: null, dateLabel: null })
   const [deleting, setDeleting] = useState(false)
 
-  const allowed = (u: User) => u.role === 'admin' || u.role === 'owner'
+  const allowed = (u: User) => canUseCashReports(u)
+  const canDelete = profile ? canDeleteCashReports(profile) : false
 
   const formatRowDate = (forDate: string) =>
     new Date(forDate + 'T12:00:00').toLocaleDateString('pl-PL')
@@ -227,6 +228,7 @@ export default function CashReportListPage() {
                       </div>
                     </div>
                   </Link>
+                  {canDelete && (
                   <button
                     type="button"
                     onClick={(e) => openDelete(e, r.id, r.for_date)}
@@ -242,6 +244,7 @@ export default function CashReportListPage() {
                       />
                     </svg>
                   </button>
+                  )}
                 </li>
               ))}
             </ul>
