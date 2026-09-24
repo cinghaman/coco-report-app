@@ -227,7 +227,7 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
               <div className="mt-1 flex flex-col sm:flex-row sm:flex-wrap sm:mt-0 sm:space-x-6">
                 <div className="mt-2 flex items-center text-sm text-gray-500">
                   <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0V6a1 1 0 011-1h2a1 1 0 011 1v1m-6 0a1 1 0 011-1h2a1 1 0 011 1v1m-6 0a1 1 0 011-1h2a1 1 0 011 1v1" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                   {formatDate(report.for_date)}
                 </div>
