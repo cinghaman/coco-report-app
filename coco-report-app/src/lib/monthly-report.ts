@@ -158,6 +158,7 @@ export function buildMonthlyMomMetrics(
       current.tableWithdrawals + current.lineWithdrawals,
       previous.tableWithdrawals + previous.lineWithdrawals
     ),
+    momMetric('Service kwotowy', current.serviceKwotowy, previous.serviceKwotowy),
     momMetric('Staff cost', current.staffCost, previous.staffCost),
   ]
 }

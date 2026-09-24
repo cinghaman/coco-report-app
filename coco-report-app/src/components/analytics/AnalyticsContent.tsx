@@ -676,8 +676,11 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
             </SectionTable>
 
             {/* By venue */}
-            {selectedVenueId === 'all' && (reportData.venueFinancial?.length ?? 0) > 0 && (
-              <SectionTable title="By venue">
+            {(reportData.venueFinancial?.length ?? 0) > 0 && (
+              <SectionTable
+                title="By venue"
+                description="Coco Lounge and Thai Varso are totaled separately, including Service (Kwotowy)."
+              >
                 <table className="min-w-full divide-y divide-gray-200 text-sm text-gray-900">
                   <thead className="bg-gray-50">
                     <tr>
@@ -690,6 +693,8 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                       <th className="px-3 py-2 text-right font-medium text-gray-500">Cash</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-500">Delivery</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-500">Withdrawals</th>
+                      <th className="px-3 py-2 text-right font-medium text-gray-500">Service kwotowy</th>
+                      <th className="px-3 py-2 text-right font-medium text-gray-500">Service 10%</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-500">Today&apos;s cash</th>
                     </tr>
                   </thead>
@@ -709,6 +714,8 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                         <td className={`px-3 py-2 ${amountCell}`}>
                           {formatCurrency(row.tableWithdrawals + row.lineWithdrawals)}
                         </td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.serviceKwotowy)}</td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.service10Percent)}</td>
                         <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.todaysCash)}</td>
                       </tr>
                     ))}
@@ -758,6 +765,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                       <th className="px-3 py-2 text-right font-medium text-gray-500">Cash</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-500">Delivery</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-500">Withdrawals</th>
+                      <th className="px-3 py-2 text-right font-medium text-gray-500">Service kwotowy</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-500">Staff cost</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-500">Today&apos;s cash</th>
                     </tr>
@@ -781,6 +789,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                         <td className={`px-3 py-2 ${amountCell}`}>
                           {formatCurrency(row.tableWithdrawals + row.lineWithdrawals)}
                         </td>
+                        <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.serviceKwotowy)}</td>
                         <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.staffCost)}</td>
                         <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(row.todaysCash)}</td>
                       </tr>
@@ -800,6 +809,7 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                         {formatCurrency(s.deliveryAppsTotal)}
                       </td>
                       <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(totalWithdrawals)}</td>
+                      <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(s.serviceKwotowy)}</td>
                       <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(s.staffCost)}</td>
                       <td className={`px-3 py-2 ${amountCell}`}>{formatCurrency(s.todaysCash)}</td>
                     </tr>

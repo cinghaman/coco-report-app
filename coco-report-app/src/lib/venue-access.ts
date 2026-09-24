@@ -59,5 +59,6 @@ export function canEditReport(
 ): boolean {
   if (user.role === 'owner') return true
   if (user.role === 'admin' && canAccessVenue(user, report.venue_id)) return true
-  return report.created_by === user.id && report.status === 'draft'
+  if (user.role === 'staff' && canAccessVenue(user, report.venue_id)) return true
+  return false
 }

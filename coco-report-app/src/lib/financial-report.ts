@@ -150,9 +150,9 @@ export function sumReportRow(
     total_sale_with_special_payment: n(row.total_sale_with_special_payment),
   })
 
-  if (extras?.tableWithdrawals) totals.tableWithdrawals += extras.tableWithdrawals
-  if (extras?.serviceKwotowy) totals.serviceKwotowy += extras.serviceKwotowy
-  if (extras?.representacja1) totals.representacja1 += extras.representacja1
+  totals.tableWithdrawals += n(extras?.tableWithdrawals)
+  totals.serviceKwotowy += n(extras?.serviceKwotowy)
+  totals.representacja1 += n(extras?.representacja1)
 }
 
 export function finalizeFinancialTotals(totals: FinancialTotals): FinancialTotals {
