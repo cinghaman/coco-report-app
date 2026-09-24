@@ -526,6 +526,8 @@ export default function AnalyticsContent({ user }: AnalyticsContentProps) {
                   value={formatCurrency(reportData.averages.netRevenue)}
                 />
                 <MetricCard label="Total withdrawals" value={formatCurrency(totalWithdrawals)} />
+                <MetricCard label="Service (Kwotowy)" value={formatCurrency(s.serviceKwotowy)} />
+                <MetricCard label="Service (10%)" value={formatCurrency(s.service10Percent)} />
                 <MetricCard
                   label="Operating costs"
                   value={formatCurrency(totalOperatingCosts)}

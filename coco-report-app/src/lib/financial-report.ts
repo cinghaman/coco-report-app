@@ -196,7 +196,7 @@ export function buildOperatingCosts(totals: FinancialTotals) {
     { label: 'Representacja 1', amount: totals.representacja1 },
     { label: 'Locker withdrawal', amount: totals.lockerWithdrawal },
     { label: 'Deposits', amount: totals.deposit },
-  ].filter((row) => row.amount > 0)
+  ].filter((row) => row.amount > 0 || row.label === 'Service kwotowy' || row.label === 'Service 10%')
 }
 
 function periodKey(date: string, groupBy: AnalyticsGroupBy): string {
