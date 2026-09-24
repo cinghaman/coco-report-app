@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import Mailgun from 'mailgun.js'
 import FormData from 'form-data'
 import { getVenueNotificationEmails, venueEmailFromName } from '@/lib/report-notifications'
+import { formatPln } from '@/lib/money'
 
 export async function DELETE(
   request: NextRequest,
@@ -135,7 +136,7 @@ export async function DELETE(
                 <p><strong>Venue:</strong> ${venueName}</p>
                 <p><strong>Date:</strong> ${reportDate}</p>
                 <p><strong>Deleted by:</strong> ${currentUser.email}</p>
-                <p><strong>Opening cash (prior day):</strong> ${opening.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })}</p>
+                <p><strong>Opening cash (prior day):</strong> ${formatPln(opening)}</p>
                 <p>This cash report and all line items have been permanently deleted.</p>
               `,
             })

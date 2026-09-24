@@ -16,6 +16,7 @@ import type {
   VenueFinancialRow,
 } from '@/lib/financial-report'
 import { filterVenuesForUser, userHasFullVenueAccess } from '@/lib/venue-access'
+import { formatPln } from '@/lib/money'
 
 type CashReportSummary = {
   reportCount: number
@@ -63,10 +64,7 @@ interface AnalyticsContentProps {
 }
 
 function formatCurrency(amount: number) {
-  return new Intl.NumberFormat('pl-PL', {
-    style: 'currency',
-    currency: 'PLN',
-  }).format(amount)
+  return formatPln(amount)
 }
 
 function formatPct(value: number) {

@@ -12,6 +12,7 @@ import {
 } from '@/lib/cash-report'
 import { venueEmailFromName, fetchVenueNameById } from '@/lib/report-notifications'
 import { filterVenuesForUser } from '@/lib/venue-access'
+import { formatPln } from '@/lib/money'
 
 export type LineDraft = {
   id: string
@@ -36,8 +37,7 @@ function newLine(): LineDraft {
   }
 }
 
-const formatMoney = (n: number) =>
-  new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(n)
+const formatMoney = formatPln
 
 /** Parse income/expense field; supports comma decimals; empty → 0 */
 function parseMoneyInput(raw: string): number {

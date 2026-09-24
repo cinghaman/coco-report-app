@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import type { User, DailyReport, Venue } from '@/lib/supabase'
 import { getTodaysCash } from '@/lib/todays-cash'
 import { canEditReport, canViewReport } from '@/lib/venue-access'
+import { formatPln } from '@/lib/money'
 
 interface ReportDetailProps {
   reportId: string
@@ -141,12 +142,7 @@ export default function ReportDetail({ reportId, user }: ReportDetailProps) {
     fetchReport()
   }, [fetchReport])
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('pl-PL', {
-      style: 'currency',
-      currency: 'PLN'
-    }).format(amount)
-  }
+  const formatCurrency = formatPln
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pl-PL', {

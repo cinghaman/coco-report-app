@@ -7,6 +7,7 @@ import type { User, Venue, DailyReport, ReportStatus } from '@/lib/supabase'
 import { getTodaysCash } from '@/lib/todays-cash'
 import { venueEmailFromName, venueNameFromJoinedRow, fetchVenueNameById } from '@/lib/report-notifications'
 import { filterVenuesForUser } from '@/lib/venue-access'
+import { formatPln } from '@/lib/money'
 
 interface EODFormProps {
   user: User
@@ -581,7 +582,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
           const action = initialData ? 'Updated' : 'Created'
           const subject = `EOD Report ${action} - ${venueName} - ${formData.for_date}`
 
-          const fmt = (n: number) => n.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })
+          const fmt = (n: number) => formatPln(n)
           const totalService = (getTotalServiceKwotowy() + formData.service_10_percent) * 0.90
           const totalCardPayment = formData.card_1 + formData.card_2
           const totalIncomeFromDelivery = (formData.przelew + formData.glovo + formData.uber + formData.wolt + formData.pyszne + formData.bolt) * 0.70
@@ -767,12 +768,7 @@ export default function EODForm({ user, initialData }: EODFormProps) {
     }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('pl-PL', {
-      style: 'currency',
-      currency: 'PLN'
-    }).format(amount)
-  }
+  const formatCurrency = formatPln
 
   const renderNumberInput = (field: keyof FormData, label: string, required = false) => {
     const displayValue = displayValues[field] || ''

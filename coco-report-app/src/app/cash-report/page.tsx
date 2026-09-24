@@ -8,9 +8,9 @@ import type { User } from '@/lib/supabase'
 import Header from '@/components/layout/Header'
 import { lineNetByCashReportId } from '@/lib/cash-report'
 import { getVenueScopeIds, canUseCashReports, canDeleteCashReports } from '@/lib/venue-access'
+import { formatPln } from '@/lib/money'
 
-const fmt = (n: number) =>
-  new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(n)
+const fmt = formatPln
 
 const PAGE_SIZE = 10
 

@@ -7,6 +7,7 @@ import {
   type ApprovedReportRow,
   type FinancialTotals,
 } from '@/lib/financial-report'
+import { formatPln } from '@/lib/money'
 
 const REPORT_FIELDS = `
   id, for_date, venue_id, status,
@@ -164,8 +165,7 @@ export function buildMonthlyMomMetrics(
   ]
 }
 
-const fmtPln = (amount: number) =>
-  amount.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' })
+const fmtPln = (amount: number) => formatPln(amount)
 
 function fmtChange(pct: number | null): string {
   if (pct === null) return '—'

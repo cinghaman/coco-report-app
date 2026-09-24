@@ -7,6 +7,7 @@ import { getTodaysCash } from '@/lib/todays-cash'
 import { isHiddenFromDashboard } from '@/lib/dashboard-venue-filter'
 import { filterVenuesForUser, userHasFullVenueAccess, canUseCashReports, canDeleteCashReports, canSeeFinancialTotals } from '@/lib/venue-access'
 import { lineNetByCashReportId } from '@/lib/cash-report'
+import { formatPln } from '@/lib/money'
 import Link from 'next/link'
 
 export type DashboardActivityRow =
@@ -323,12 +324,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
     }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('pl-PL', {
-      style: 'currency',
-      currency: 'PLN'
-    }).format(amount)
-  }
+  const formatCurrency = formatPln
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pl-PL')
